@@ -5,22 +5,25 @@
 //
 // - in the analysed repository Compadr runs `git clone` and `git fetch` (from
 //   it), `git rev-parse` and `git config --get`, which change nothing there;
-// - in its own clone it creates the draft branches, writes the records and
-//   commits, and pushes a draft to the origin remote of the analysed
-//   repository on `compadr draft publish`;
+// - in its own clone it creates the draft branches and builds their commits
+//   from git objects, without checking out any tree (see `commitFiles`), and
+//   pushes a draft to the origin remote of the analysed repository on
+//   `compadr draft publish`;
 // - `gh pr create` opens the pull request on GitHub.
 //
 // Each correction command passes `--draft <name>`: it reads the records at the
 // tip of the draft, so that a second correction sees the first one.
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, realpathSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import {
+  commitFiles,
   commitIdentity,
   githubRepository,
   originUrl,
   PublishError,
   runCommand,
+  SHOW_COMMIT,
   type CommandRunner,
   type Correction,
 } from './publish.ts'
@@ -218,34 +221,26 @@ export class DraftStore {
     correction: Correction,
     author?: CommitAuthor
   ): Promise<string> {
-    await this.#git('checkout', '--quiet', '--force', draft.branch)
-    for (const [path, content] of correction.files) {
-      const file = join(this.clone, path)
-      mkdirSync(dirname(file), { recursive: true })
-      writeFileSync(file, content)
-    }
-    await this.#git('add', '--', ...correction.files.keys())
-    await this.#run(
-      'git',
-      [
-        ...(author === undefined
+    const ref = `refs/heads/${draft.branch}`
+    const tip = (await this.#git('rev-parse', '--verify', ref)).trim()
+    const commit = await commitFiles(this.#run, this.clone, {
+      parent: tip,
+      files: correction.files,
+      identity:
+        author === undefined
           ? await commitIdentity(this.#repository, this.#run)
           : [
               '-c',
               `user.name=${author.name}`,
               '-c',
               `user.email=${author.email}`,
-            ]),
-        'commit',
-        '--quiet',
-        '-m',
-        correction.title,
-        '-m',
-        correction.body,
-      ],
-      this.clone
-    )
-    return this.#git('show', '--stat', '--patch', '--format=%s%n', 'HEAD')
+            ],
+      title: correction.title,
+      body: correction.body,
+    })
+    // The old value makes the update fail if the draft moved meanwhile.
+    await this.#git('update-ref', ref, commit, tip)
+    return this.#git(...SHOW_COMMIT, commit)
   }
 
   /** The names of the drafts, in name order. */
@@ -309,6 +304,7 @@ export class DraftStore {
         'diff',
         '--no-color',
         '--no-ext-diff',
+        '--no-textconv',
         draft.base,
         draft.branch
       )
@@ -328,6 +324,7 @@ export class DraftStore {
       'show',
       '--no-color',
       '--no-ext-diff',
+      '--no-textconv',
       '--format=',
       commit
     )
@@ -335,7 +332,14 @@ export class DraftStore {
 
   /** `git diff --stat` between the start and the tip of the draft. */
   diffStat(draft: Draft): Promise<string> {
-    return this.#git('diff', '--stat', draft.base, draft.branch)
+    return this.#git(
+      'diff',
+      '--stat',
+      '--no-ext-diff',
+      '--no-textconv',
+      draft.base,
+      draft.branch
+    )
   }
 
   /** The message of a commit of the draft, without its subject. */
@@ -345,8 +349,17 @@ export class DraftStore {
 
   /** Deletes the draft branch and its description. */
   async discard(draft: Draft): Promise<void> {
-    // The checked out branch cannot be deleted: leave it first.
-    await this.#git('checkout', '--quiet', '--force', '--detach')
+    // A clone of an earlier version may have the draft checked out, and git
+    // does not delete the current branch: HEAD leaves it without a checkout.
+    const head = await this.#git(
+      'rev-parse',
+      '--verify',
+      '--quiet',
+      'HEAD'
+    ).catch(() => '')
+    if (head.trim() !== '') {
+      await this.#git('update-ref', '--no-deref', 'HEAD', head.trim())
+    }
     await this.#git('branch', '--quiet', '-D', draft.branch)
     await this.#git(
       'config',
