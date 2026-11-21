@@ -29,6 +29,20 @@ describe('normalizeStatus', () => {
     expect(normalizeStatus(raw)).toBe(status)
   })
 
+  it.each([
+    ['Decided (2024-03-01)', 'accepted'],
+    ['Décidée le 2024-03-01', 'accepted'],
+    ['Decided to wait', 'unknown'],
+    ['Decided against', 'unknown'],
+    ['Decided by the team, rejected', 'rejected'],
+    ['Décidé de reporter', 'unknown'],
+  ] as const)(
+    'reads "Decided" as a status only on its own: %s',
+    (raw, status) => {
+      expect(normalizeStatus(raw)).toBe(status)
+    }
+  )
+
   it('keeps the first keyword of the text', () => {
     expect(normalizeStatus('Accepted (proposed on 2026-01-02)')).toBe(
       'accepted'

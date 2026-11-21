@@ -415,6 +415,8 @@ describe('a status written as a dated list', () => {
     ['- 2025-03-24: Accepted\n- 2024-10-22: Drafted', 'accepted'],
     // Words between parentheses are a note, not a state.
     ['- 2024-04-02: Drafted (not accepted yet)', 'proposed'],
+    // A sentence that starts with "Decided" is not a state.
+    ['- 2024-02-20: Drafted\n- 2024-03-01: Decided to wait', 'proposed'],
   ] as const)('reads %j as %s', (list, expected) => {
     expect(status(`# 10. Cache\n\n## Status\n\n${list}\n`).status).toBe(
       expected
@@ -435,6 +437,14 @@ describe('a status written as a dated list', () => {
         '# 29. Use pnpm\n\n2024-10-31: proposed\n2024-11-21: postponed to later\n2025-12-09: Accepted\n\n## Context\n'
       )
     ).toEqual({ rawStatus: '2025-12-09: Accepted', status: 'accepted' })
+  })
+
+  it('reads no state from a sentence of the header', () => {
+    expect(
+      status(
+        '# 10. Cache\n\n2024-01-01: Decided to use Postgres\n\n## Context\n'
+      ).status
+    ).toBe('unknown')
   })
 
   it('keeps a section that is not a dated list as it reads it', () => {
