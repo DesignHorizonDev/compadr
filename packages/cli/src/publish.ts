@@ -5,8 +5,9 @@
 // - in the analysed repository it runs `git clone` (from it), `git fetch`
 //   (from it) and `git config --get` (the author identity and the URL of
 //   origin), which change nothing there;
-// - in the temporary clone it checks out a new branch, writes the records,
-//   commits, and pushes the branch to the remote of the analysed repository;
+// - in the temporary clone it builds the commit from git objects, without
+//   checking out the tree of the analysed commit (see `commitFiles`), and
+//   pushes it to the remote of the analysed repository;
 // - `gh pr create` opens the pull request on GitHub.
 //
 // It never forces a push and never writes in the working copy of the
@@ -105,6 +106,10 @@ export async function originUrl(
     ]).catch(() => '')
   ).trim()
   if (url === '') throw new PublishError(`${repository} has no origin remote`)
+  // git would read such a URL as an option of `git push`.
+  if (url.startsWith('-')) {
+    throw new PublishError(`${url} is not a remote URL`)
+  }
   // `scheme://…` and `host:path` stay as they are.
   if (/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(url) || /^[^/]+:/.test(url)) {
     return url
@@ -137,6 +142,159 @@ export async function commitIdentity(
   return identity
 }
 
+/**
+ * A path of a correction: relative to the root of the repository, without
+ * an empty, `.`, `..` or `.git` part.
+ */
+export function checkCorrectionPath(path: string): string {
+  const parts = path.split('/')
+  if (
+    path.startsWith('/') ||
+    path.includes('\0') ||
+    parts.some(
+      part =>
+        part === '' ||
+        part === '.' ||
+        part === '..' ||
+        part.toLowerCase() === '.git'
+    )
+  ) {
+    throw new PublishError(`${path} is not a path inside the repository`)
+  }
+  return path
+}
+
+/**
+ * Commits `files` on `parent` in `clone`, and returns the new commit. The
+ * commit is built from git objects in an index of its own: the tree of the
+ * analysed commit is never checked out. A link of that tree cannot redirect
+ * a write outside the clone, and none of its filters runs.
+ */
+export async function commitFiles(
+  run: CommandRunner,
+  clone: string,
+  request: {
+    parent: string
+    files: ReadonlyMap<string, string>
+    /** `-c user.name=… -c user.email=…`, or nothing. */
+    identity: readonly string[]
+    title: string
+    body: string
+  }
+): Promise<string> {
+  for (const path of request.files.keys()) checkCorrectionPath(path)
+  const work = mkdtempSync(join(tmpdir(), 'compadr-commit-'))
+  const env = { GIT_INDEX_FILE: join(work, 'index') }
+  const git = async (...args: string[]) =>
+    (await run('git', args, clone, env)).trim()
+  try {
+    await git('read-tree', request.parent)
+    const modes = await treeModes(run, clone, request.parent, [
+      ...request.files.keys(),
+    ])
+    // One hash-object and one update-index for all the files.
+    const entries = [...request.files]
+    const blobFiles = entries.map(([, content], i) => {
+      const file = join(work, `blob-${i}`)
+      writeFileSync(file, content)
+      return file
+    })
+    const blobs = (
+      await git('hash-object', '-w', '--no-filters', '--', ...blobFiles)
+    ).split('\n')
+    await git(
+      'update-index',
+      '--add',
+      ...entries.flatMap(([path], i) => [
+        '--cacheinfo',
+        `${fileMode(path, modes)},${blobs[i]},${path}`,
+      ])
+    )
+    const tree = await git('write-tree')
+    return await git(
+      ...request.identity,
+      'commit-tree',
+      tree,
+      '-p',
+      request.parent,
+      '-m',
+      request.title,
+      '-m',
+      request.body
+    )
+  } finally {
+    rmSync(work, { recursive: true, force: true })
+  }
+}
+
+/**
+ * The mode of each path of `paths` and of each of their folders in the tree
+ * of `commit`, for the paths that the tree holds.
+ */
+async function treeModes(
+  run: CommandRunner,
+  clone: string,
+  commit: string,
+  paths: readonly string[]
+): Promise<Map<string, string>> {
+  const wanted = new Set<string>()
+  for (const path of paths) {
+    const parts = path.split('/')
+    for (let i = 1; i <= parts.length; i++) {
+      wanted.add(parts.slice(0, i).join('/'))
+    }
+  }
+  const output = await run(
+    'git',
+    ['--literal-pathspecs', 'ls-tree', '-z', commit, '--', ...wanted],
+    clone
+  )
+  const modes = new Map<string, string>()
+  for (const entry of output.split('\0')) {
+    // `<mode> <type> <object>\t<path>`
+    const tab = entry.indexOf('\t')
+    if (tab < 0) continue
+    const path = entry.slice(tab + 1)
+    if (wanted.has(path)) modes.set(path, entry.slice(0, entry.indexOf(' ')))
+  }
+  return modes
+}
+
+/**
+ * The mode of a file of a correction. An executable file stays executable,
+ * and a link becomes a regular file. A path under an entry of the tree that
+ * is not a folder, such as a folder versioned as a link, is refused.
+ */
+function fileMode(path: string, modes: ReadonlyMap<string, string>): string {
+  const parts = path.split('/')
+  for (let i = 1; i < parts.length; i++) {
+    const folder = parts.slice(0, i).join('/')
+    const mode = modes.get(folder)
+    if (mode !== undefined && mode !== '040000') {
+      throw new PublishError(
+        `${path} cannot be written: ${folder} is not a folder in the repository`
+      )
+    }
+  }
+  const mode = modes.get(path)
+  if (mode === '040000' || mode === '160000') {
+    throw new PublishError(
+      `${path} cannot be written: it is a folder in the repository`
+    )
+  }
+  return mode === '100755' ? '100755' : '100644'
+}
+
+/** `git show` of a commit, without the diff programs of any configuration. */
+export const SHOW_COMMIT = [
+  'show',
+  '--stat',
+  '--patch',
+  '--no-ext-diff',
+  '--no-textconv',
+  '--format=%s%n',
+] as const
+
 export async function publish(
   correction: Correction,
   options: PublishOptions,
@@ -162,31 +320,25 @@ export async function publish(
       correction.repository,
       '+refs/*:refs/compadr-source/*'
     )
-    await git('checkout', '--quiet', '-b', correction.branch, correction.commit)
-    for (const [path, content] of correction.files) {
-      writeFileSync(join(clone, path), content)
-    }
-    await git('add', '--', ...correction.files.keys())
-    await run(
-      'git',
-      [
-        ...(await commitIdentity(correction.repository, run)),
-        'commit',
-        '--quiet',
-        '-m',
-        correction.title,
-        '-m',
-        correction.body,
-      ],
-      clone
-    )
-    const diff = await git('show', '--stat', '--patch', '--format=%s%n', 'HEAD')
+    const commit = await commitFiles(run, clone, {
+      parent: correction.commit,
+      files: correction.files,
+      identity: await commitIdentity(correction.repository, run),
+      title: correction.title,
+      body: correction.body,
+    })
+    const diff = await git(...SHOW_COMMIT, commit)
 
     if (!options.push && !options.openPullRequest) {
       return { diff, pushedTo: null, pullRequest: null }
     }
     const url = await originUrl(correction.repository, run)
-    await git('push', '--quiet', url, `HEAD:refs/heads/${correction.branch}`)
+    await git(
+      'push',
+      '--quiet',
+      url,
+      `${commit}:refs/heads/${correction.branch}`
+    )
     if (!options.openPullRequest) {
       return { diff, pushedTo: url, pullRequest: null }
     }

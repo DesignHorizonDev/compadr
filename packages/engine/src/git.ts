@@ -86,7 +86,8 @@ function checkCommand(
     )
   }
   // `git diff` runs the program of `diff.external` and the filters of
-  // `textconv` unless it is told not to.
+  // `textconv` unless it is told not to. `gitArgs` adds these options too:
+  // a caller that names them states that its output depends on them.
   if (
     subcommand === 'diff' &&
     !(args.includes('--no-ext-diff') && args.includes('--no-textconv'))
@@ -103,12 +104,43 @@ function checkCommand(
   }
 }
 
+// Settings that the configuration of the analysed repository could turn
+// into a program: the program that checks a signature in `git log` and
+// `git show`, and the fsmonitor hook. An empty ignoreRevsFile drops the file
+// that the configuration may name.
+const NEUTRAL_CONFIG = [
+  '-c',
+  'log.showSignature=false',
+  '-c',
+  'core.fsmonitor=false',
+  '-c',
+  'blame.ignoreRevsFile=',
+]
+
+// Options added to each subcommand that can run a textconv filter or an
+// external diff program of the configuration.
+const NEUTRAL_OPTIONS: Partial<Record<ReadOnlySubcommand, readonly string[]>> =
+  {
+    blame: ['--no-textconv'],
+    diff: ['--no-ext-diff', '--no-textconv'],
+    log: ['--no-ext-diff', '--no-textconv', '--no-show-signature'],
+    show: ['--no-ext-diff', '--no-textconv', '--no-show-signature'],
+  }
+
 function gitArgs(
   repoPath: string,
   subcommand: ReadOnlySubcommand,
   args: readonly string[]
 ): string[] {
-  return ['--no-pager', '-C', repoPath, subcommand, ...args]
+  return [
+    '--no-pager',
+    ...NEUTRAL_CONFIG,
+    '-C',
+    repoPath,
+    subcommand,
+    ...(NEUTRAL_OPTIONS[subcommand] ?? []),
+    ...args,
+  ]
 }
 
 // Without optional locks, git does not refresh the index of the analysed

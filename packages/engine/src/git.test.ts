@@ -1,5 +1,11 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -123,6 +129,73 @@ describe('runGit', () => {
       exitCode: 128,
       message: expect.stringContaining('git rev-parse failed') as string,
     })
+  })
+})
+
+describe('runGit, on a repository whose configuration names programs', () => {
+  let configured: string
+  let marker: string
+
+  beforeAll(() => {
+    configured = mkdtempSync(join(tmpdir(), 'compadr-configured-'))
+    marker = join(configured, 'ran')
+    const program = join(configured, 'program.sh')
+    writeFileSync(program, `#!/bin/sh\necho "$@" >> '${marker}'\ncat "$1"\n`)
+    chmodSync(program, 0o755)
+    const repoGit = (...args: string[]) =>
+      execFileSync('git', ['-C', configured, ...args], { encoding: 'utf8' })
+    repoGit('init', '-q', '-b', 'main')
+    writeFileSync(join(configured, '.gitattributes'), '* diff=configured\n')
+    writeFileSync(join(configured, 'a.md'), 'one\n')
+    repoGit('add', '.')
+    repoGit(
+      '-c',
+      'user.name=Compadr',
+      '-c',
+      'user.email=fixture@example.com',
+      'commit',
+      '-q',
+      '-m',
+      'Add a.md'
+    )
+    // A commit that carries a signature, so that git log checks it.
+    const tree = repoGit('rev-parse', 'HEAD^{tree}').trim()
+    const signed = [
+      `tree ${tree}`,
+      `parent ${repoGit('rev-parse', 'HEAD').trim()}`,
+      'author Compadr <fixture@example.com> 1767000000 +0000',
+      'committer Compadr <fixture@example.com> 1767000000 +0000',
+      'gpgsig -----BEGIN PGP SIGNATURE-----',
+      ' AAAA',
+      ' -----END PGP SIGNATURE-----',
+      '',
+      'Signed',
+      '',
+    ].join('\n')
+    const commit = execFileSync(
+      'git',
+      ['-C', configured, 'hash-object', '-t', 'commit', '-w', '--stdin'],
+      { input: signed, encoding: 'utf8' }
+    ).trim()
+    repoGit('update-ref', 'refs/heads/main', commit)
+    repoGit('config', 'diff.configured.textconv', program)
+    repoGit('config', 'log.showSignature', 'true')
+    repoGit('config', 'gpg.program', program)
+  })
+
+  afterAll(() => rmSync(configured, { recursive: true, force: true }))
+
+  it('runs none of them in blame, log, show and diff', async () => {
+    await runGit(configured, 'blame', ['--porcelain', 'HEAD', '--', 'a.md'])
+    await runGit(configured, 'log', ['-p', '--format=%H', 'HEAD'])
+    await runGit(configured, 'show', ['HEAD'])
+    await runGit(configured, 'diff', [
+      '--no-ext-diff',
+      '--no-textconv',
+      'HEAD~1',
+      'HEAD',
+    ])
+    expect(existsSync(marker)).toBe(false)
   })
 })
 
