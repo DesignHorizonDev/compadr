@@ -1,7 +1,7 @@
 {
   "name": "@compadr/format",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "The Compadr decision record format: compadr fields, supported ADR dialects and JSON schemas.",
   "keywords": [
     "adr",

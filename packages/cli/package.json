@@ -1,7 +1,7 @@
 {
   "name": "@compadr/cli",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Keep architecture decision records (ADRs) true to the code: drift report, check in CI, and an MCP server for coding agents.",
   "keywords": [
     "adr",
