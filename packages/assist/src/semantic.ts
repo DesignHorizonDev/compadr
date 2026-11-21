@@ -20,6 +20,7 @@ import { runAssist } from './assist.ts'
 import {
   AssistCapReachedError,
   httpAssistClient,
+  oneLine,
   type AssistClient,
 } from './client.ts'
 
@@ -54,6 +55,9 @@ export type SemanticCheck =
     }
 
 const FILE_START = /(?=^diff --git )/m
+
+/** Length of the model name and of the prompt version shown, at most. */
+const PROVENANCE_CHARS = 100
 
 /**
  * The diff without the files that the settings keep in the repository. A
@@ -205,8 +209,12 @@ export async function semanticCheck(
     })),
     rejected: outcome.rejected,
     excluded: kept.excluded,
-    model: suggestion.provenance.model,
-    promptVersion: suggestion.provenance.promptVersion,
+    // Shown on the summary line of the check: one short line each.
+    model: oneLine(suggestion.provenance.model).slice(0, PROVENANCE_CHARS),
+    promptVersion: oneLine(suggestion.provenance.promptVersion).slice(
+      0,
+      PROVENANCE_CHARS
+    ),
   }
 }
 

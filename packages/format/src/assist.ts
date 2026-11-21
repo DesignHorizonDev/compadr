@@ -321,14 +321,17 @@ export function assistSuggestionJsonSchema(): Record<string, unknown> {
  * no longer matches.
  */
 export function normalizeQuote(text: string): string {
-  return text
-    .normalize('NFC')
-    .replace(/[\u2018\u2019\u02bc]/g, "'")
-    .replace(/[\u00a0\u202f]/g, ' ')
-    .replace(/^\s*>\s?/gm, '')
-    .replace(/[*`]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
+  return (
+    text
+      .normalize('NFC')
+      .replace(/[\u2018\u2019\u02bc]/g, "'")
+      .replace(/[\u00a0\u202f]/g, ' ')
+      // `[ \t]`, not `\s`: a run of empty lines is read once, not once per line.
+      .replace(/^[ \t]*>[ \t]?/gm, '')
+      .replace(/[*`]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  )
 }
 
 /** Characters of each part of a quote, at least, once normalized. */

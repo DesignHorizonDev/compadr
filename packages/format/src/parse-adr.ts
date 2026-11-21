@@ -1,4 +1,4 @@
-import { parse as parseYaml } from 'yaml'
+import { parseYaml } from './yaml.ts'
 import { findAdrNumbers } from './adr-reference.ts'
 import { readAnchors, type RecordedAnchor } from './anchor.ts'
 import { parseAdrFileName } from './adr-file.ts'
@@ -53,16 +53,17 @@ export interface CheckedEntry {
 
 const FRONTMATTER = /^---\n([\s\S]*?)\n---(?:\n|$)/
 // "Status: accepted", "- **Status:** Accepted", "- **Statut** : acceptée". The
-// colon is required, and the value stays on the same line.
+// colon is required, and the value stays on the same line. Two runs of
+// spaces never sit side by side: each line is read in linear time.
 const STATUS_LINE =
-  /^[ \t]*(?:[-*][ \t]+)?\**(?:Status|Statut)\**[ \t]*:[ \t]*\**[ \t]*(\S.*)$/im
+  /^[ \t]*(?:[-*][ \t]+)?\**(?:Status|Statut)\**[ \t]*:[ \t]*(?:\*+[ \t]*)?(\S.*)$/im
 const STATUS_SECTION =
   /^## (?:Status|Statut)[ \t]*\n(?:[ \t]*\n)*[ \t]*(\S.*)$/im
 const DATE_LINE =
-  /^[ \t]*(?:[-*][ \t]+)?\**Date\**[ \t]*:[ \t]*\**[ \t]*(\d{4}-\d{2}-\d{2})/im
+  /^[ \t]*(?:[-*][ \t]+)?\**Date\**[ \t]*:[ \t]*(?:\*+[ \t]*)?(\d{4}-\d{2}-\d{2})/im
 // "- Deciders: Ana, Bo", "* **Decision-makers:** Ana", "- **Décideurs** : Ana".
 const DECIDERS_LINE =
-  /^[ \t]*(?:[-*][ \t]+)?\**(?:Deciders|Decision[- ]makers|Décideurs|Décideuses)\**[ \t]*:[ \t]*\**[ \t]*(\S.*)$/im
+  /^[ \t]*(?:[-*][ \t]+)?\**(?:Deciders|Decision[- ]makers|Décideurs|Décideuses)\**[ \t]*:[ \t]*(?:\*+[ \t]*)?(\S.*)$/im
 const FRONTMATTER_STATUS = /^status:\s*(.+)$/m
 const FRONTMATTER_DATE = /^date:\s*(\d{4}-\d{2}-\d{2})/m
 // "# ADR-0012 — Title", "# ADR 12 Title", "# 12. Title", "# 0012 : Title". A
@@ -225,8 +226,8 @@ function headerOf(lines: readonly string[], bodyStart: number): string[] {
 
 // A heading that records an amendment: "## Amendment (2026-10-10)",
 // "## Amendement du lot J4", "## What this amends", "## Ce que cela amende".
-const AMENDMENT_HEADING =
-  /^(#{2,6})\s+.*\b(?:amendments?|amendements?|amends?|amende)\b/i
+const AMENDMENT_LEVEL = /^(#{2,6})\s/
+const AMENDMENT_WORD = /\b(?:amendments?|amendements?|amends?|amende)\b/i
 
 /**
  * Decisions that the amendment sections of a record name. Records are
@@ -251,9 +252,13 @@ function amendmentSections(
     const heading =
       fence === null && marker === undefined ? /^(#{1,6})\s/.exec(line) : null
     if (heading !== null) {
-      const amendment = AMENDMENT_HEADING.exec(line)
-      if (amendment !== null) level = amendment[1]!.length
-      else if (heading[1]!.length <= level) level = 0
+      const amendment = AMENDMENT_LEVEL.exec(line)
+      if (
+        amendment !== null &&
+        AMENDMENT_WORD.test(line.slice(amendment[0].length))
+      ) {
+        level = amendment[1]!.length
+      } else if (heading[1]!.length <= level) level = 0
       continue
     }
     if (level === 0) continue

@@ -5,10 +5,10 @@ import {
   applyFeatureEdit,
   FEATURE_GLOSSARY,
   FEATURE_ID,
+  parseYaml,
   writeFeatureGlossary,
   type DriftReport,
 } from '@compadr/format'
-import { parse as parseYaml } from 'yaml'
 import type { Correction } from './publish.ts'
 
 export class FeaturesCommandError extends Error {}
