@@ -433,11 +433,13 @@ export function consoleDrafts(
             ])
           ).trim()
           const user = (
-            await run(
-              'git',
-              ['config', '--get', 'user.name'],
-              repository.repository
-            ).catch(() => '')
+            await run('git', [
+              '-C',
+              repository.repository,
+              'config',
+              '--get',
+              'user.name',
+            ]).catch(() => '')
           ).trim()
           return buildCheckedCorrection(
             repository.repository,

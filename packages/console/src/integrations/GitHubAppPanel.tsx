@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { GitHubAppState, PortalSource } from '../portal.ts'
+import { safeHref } from '../links.ts'
 
 type Loadable<T> =
   | { state: 'loading' }
@@ -105,7 +106,7 @@ export function GitHubAppPanel({ portal }: { portal: PortalSource }) {
           <p>
             The app{' '}
             {state.htmlUrl ? (
-              <a href={state.htmlUrl} rel="noreferrer noopener">
+              <a href={safeHref(state.htmlUrl)} rel="noreferrer noopener">
                 {state.slug}
               </a>
             ) : (
@@ -118,7 +119,7 @@ export function GitHubAppPanel({ portal }: { portal: PortalSource }) {
           </p>
           {!state.installation && state.installUrl && (
             <p>
-              <a href={state.installUrl} rel="noreferrer noopener">
+              <a href={safeHref(state.installUrl)} rel="noreferrer noopener">
                 Install the app on {state.organization}
               </a>
               , on the repositories of <code>portal.yml</code> only.

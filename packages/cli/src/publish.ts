@@ -17,6 +17,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
+import { programPath } from '@compadr/engine'
 
 const exec = promisify(execFile)
 
@@ -31,7 +32,7 @@ export type CommandRunner = (
 
 export const runCommand: CommandRunner = async (program, args, cwd, env) => {
   try {
-    const { stdout } = await exec(program, args, {
+    const { stdout } = await exec(programPath(program), args, {
       cwd,
       maxBuffer: 64 * 1024 * 1024,
       env: { ...process.env, GIT_TERMINAL_PROMPT: '0', ...env },

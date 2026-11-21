@@ -1,6 +1,8 @@
 import {
+  chmodSync,
   existsSync,
   lstatSync,
+  mkdirSync,
   readFileSync,
   realpathSync,
   writeFileSync,
@@ -1599,7 +1601,12 @@ function defaultCacheDir(): string {
   // The XDG specification ignores a relative path.
   const xdg = process.env.XDG_CACHE_HOME
   const base = xdg && isAbsolute(xdg) ? xdg : join(homedir(), '.cache')
-  return join(base, 'compadr')
+  const folder = join(base, 'compadr')
+  // The cache holds reports and clones of the repositories: the other
+  // accounts of the machine do not read it.
+  mkdirSync(folder, { recursive: true, mode: 0o700 })
+  chmodSync(folder, 0o700)
+  return folder
 }
 
 async function mcp(

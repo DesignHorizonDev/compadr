@@ -1,6 +1,7 @@
 // `compadr-console`: serves the console on the decisions of git repositories.
-import { existsSync, realpathSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, realpathSync } from 'node:fs'
 import type { Server } from 'node:http'
+import { randomBytes } from 'node:crypto'
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { parseArgs } from 'node:util'
@@ -133,7 +134,12 @@ function defaultCacheDir(): string {
   // The XDG specification ignores a relative path.
   const xdg = process.env.XDG_CACHE_HOME
   const base = xdg && isAbsolute(xdg) ? xdg : join(homedir(), '.cache')
-  return join(base, 'compadr')
+  const folder = join(base, 'compadr')
+  // The cache holds reports and clones of the repositories: the other
+  // accounts of the machine do not read it.
+  mkdirSync(folder, { recursive: true, mode: 0o700 })
+  chmodSync(folder, 0o700)
+  return folder
 }
 
 /** Real path of `folder`, or of its nearest parent that exists. */
@@ -348,11 +354,16 @@ export async function runConsole(
           'compadr-console: "Draft a decision from this change" sends the change of a branch to the assist service, and each new draft costs'
         )
       }
-      if (!isLoopback(values.host ?? '127.0.0.1')) {
-        output.err(
-          `compadr-console: warning: the console listens on ${values.host}, so another machine that reaches the port can ask the assist service, at your cost`
-        )
-      }
+    }
+    // Open to the network, the console asks for a token: another machine
+    // that reaches the port could otherwise read the decisions and add
+    // commits to the drafts.
+    const open = !isLoopback(values.host ?? '127.0.0.1')
+    const token = open ? randomBytes(24).toString('base64url') : undefined
+    if (open) {
+      output.err(
+        `compadr-console: warning: the console listens on ${values.host}. Another machine that reaches the port needs the token of the printed address to read the repositories${assistUrl === '' ? '' : ' and ask the assist service, at your cost'}`
+      )
     }
     reports.warm()
     const host = values.host ?? '127.0.0.1'
@@ -361,7 +372,8 @@ export async function runConsole(
       reports,
       message => output.err(`compadr-console: ${message}`),
       host,
-      reports.drafts
+      reports.drafts,
+      token
     )
     await new Promise<void>((done, fail) => {
       server.once('error', fail)
@@ -373,8 +385,9 @@ export async function runConsole(
     const address = server.address()
     const shown = typeof address === 'object' && address ? address.port : port
     const where = host.includes(':') ? `[${host}]` : host
+    const query = token === undefined ? '' : `/?token=${token}`
     output.out(
-      `compadr-console: http://${where}:${shown} serves ${repositories.length} ${repositories.length === 1 ? 'repository' : 'repositories'} at ${ref}`
+      `compadr-console: http://${where}:${shown}${query} serves ${repositories.length} ${repositories.length === 1 ? 'repository' : 'repositories'} at ${ref}`
     )
     return server
   } catch (error) {
@@ -387,8 +400,9 @@ export async function runConsole(
       output.err(`compadr-console: ${error.message}`)
       return 1
     }
-    const code = (error as { code?: unknown }).code
-    if (code === 'EADDRINUSE' || code === 'EACCES') {
+    // The server could not listen: the port is taken, refused, or the
+    // address is not one of this machine.
+    if ((error as { syscall?: unknown }).syscall === 'listen') {
       output.err(`compadr-console: ${(error as Error).message}`)
       return 1
     }
