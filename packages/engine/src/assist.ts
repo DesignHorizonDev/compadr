@@ -456,7 +456,12 @@ async function codeOfRecord(
   return cited
 }
 
-/** The span of a cited symbol: its declaration, or else the start of the file. */
+/**
+ * The span of what a record cites in a file. An anchored symbol gives its
+ * declaration, or the class that holds a method. When no line of the file
+ * declares it, the record still cites the file: its start is sent, as for a
+ * file cited whole.
+ */
 function spanOf(code: CitedCode, text: string): Span {
   if ('lines' in code) return code.lines
   if ('symbol' in code) {

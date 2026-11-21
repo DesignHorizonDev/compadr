@@ -730,6 +730,7 @@ describe('accept requests and the code that the record cites', () => {
             'Flows are compiled by `compileFlow`, in `src/flow/compile.ts`.',
             'The pruner keeps the fields of `src/flow/prune.ts:60-70`.',
             'The pages live in `src/pages/`.',
+            'Each step goes through `src/flow/step.ts#Step.run`, then `src/flow/hidden.ts#nowhere`.',
             '',
           ].join('\n'),
           'src/flow/compile.ts': numbered(200, {
@@ -737,6 +738,8 @@ describe('accept requests and the code that the record cites', () => {
           }),
           'src/flow/prune.ts': numbered(100),
           'src/pages/a.ts': numbered(5),
+          'src/flow/step.ts': numbered(80, { 70: 'export class Step {' }),
+          'src/flow/hidden.ts': numbered(60),
           'src/other.ts': numbered(5, { 2: '// ADR-0001' }),
         },
       },
@@ -762,6 +765,10 @@ describe('accept requests and the code that the record cites', () => {
       ['src/flow/compile.ts', 140, 41],
       // Cited lines keep the same window around them. The folder gives nothing.
       ['src/flow/prune.ts', 50, 51],
+      // An anchored method gives the class that holds it, and a symbol that
+      // no line declares gives the start of its file.
+      ['src/flow/step.ts', 60, 21],
+      ['src/flow/hidden.ts', 1, 31],
     ])
     expect(request.omittedFiles).toEqual([])
 
@@ -771,6 +778,8 @@ describe('accept requests and the code that the record cites', () => {
       ['src/other.ts', 1],
       ['src/flow/compile.ts', 140],
       ['src/flow/prune.ts', 50],
+      ['src/flow/step.ts', 60],
+      ['src/flow/hidden.ts', 1],
     ])
   })
 })
