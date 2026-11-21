@@ -246,9 +246,8 @@ export function buildCheckRequest(
  * The chain that a consolidated rule reads, with the distance of each record
  * to the decision: the decision, the older ones it amends, and the newer ones
  * that amend it, each followed further in the same direction. A sibling
- * (another decision amended by an ancestor) stays out. The newer decisions
- * come from `amends` alone, since a record that says "Amends ADR-0008" does
- * not always fill `amendedBy` of 0008.
+ * (another decision amended by an ancestor) stays out. A link counts on
+ * either side: "Amends ADR-0008" in 0034, or "Amended by ADR-0034" in 0008.
  */
 function chainDistances(
   report: DriftReport,
@@ -258,11 +257,16 @@ function chainDistances(
   const distances = new Map<number, number>()
   if (!byNumber.has(number)) return distances
   distances.set(number, 0)
-  const newer = new Map<number, number[]>()
+  const newer = new Map<number, Set<number>>()
+  const older = new Map<number, Set<number>>()
+  const link = (from: number, to: number) => {
+    if (from <= to) return
+    newer.set(to, (newer.get(to) ?? new Set()).add(from))
+    older.set(from, (older.get(from) ?? new Set()).add(to))
+  }
   for (const decision of report.decisions) {
-    for (const older of decision.amends) {
-      newer.set(older, [...(newer.get(older) ?? []), decision.number])
-    }
+    for (const n of decision.amends) link(decision.number, n)
+    for (const n of decision.amendedBy) link(n, decision.number)
   }
   const follow = (next: (n: number) => number[]) => {
     let level = [number]
@@ -280,8 +284,8 @@ function chainDistances(
       level = following
     }
   }
-  follow(n => byNumber.get(n)?.amends ?? [])
-  follow(n => newer.get(n) ?? [])
+  follow(n => [...(older.get(n) ?? [])])
+  follow(n => [...(newer.get(n) ?? [])])
   return distances
 }
 

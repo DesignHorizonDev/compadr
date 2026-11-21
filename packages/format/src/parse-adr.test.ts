@@ -381,6 +381,56 @@ describe('the deciders of a record', () => {
   })
 })
 
+describe('a list of decisions after one ADR prefix', () => {
+  const header = (line: string) =>
+    parseAdr(
+      'docs/adr/0045-a.md',
+      `# 45. A\n\n- Statut : acceptée\n- ${line}\n`
+    )!
+
+  it.each([
+    [
+      "Complète les ADR 0002, 0010 et 0012. L'inscription reste fermée.",
+      [2, 10, 12],
+    ],
+    ['Amende les ADR 0010 et 0011 sur un point.', [10, 11]],
+    [
+      'Complète les ADR 0010, 0012 et 0018. Remplace trois règles :',
+      [10, 12, 18],
+    ],
+    ['Amends ADRs 3 and 4.', [3, 4]],
+    ['Amends ADR-0003, ADR-0004 & 0005.', [3, 4, 5]],
+    // Numbers without leading zeros grow by one digit.
+    ['Amends ADR 9, 10 and 11.', [9, 10, 11]],
+    // A comma before the last conjunction.
+    ['Amende les ADR 2, 3, ou 4.', [2, 3, 4]],
+    ['Amends ADRs 3, 4, and 5.', [3, 4, 5]],
+  ] as const)('reads every decision of %j', (line, amends) => {
+    expect(header(line).amends).toEqual(amends)
+  })
+
+  it.each([
+    // A number of another width is not a decision: a count, a date.
+    ["Complète l'ADR 0010 et 3 autres points.", [10]],
+    ['Amends ADR 0010, 2026-10-21.', [10]],
+    ['Amends ADR 12, 1.5 times the limit.', [12]],
+    // A smaller number of another width is not the next decision.
+    ['Amends ADR 10, 9 more points.', [10]],
+    ['Amends ADR 0009, 10 more points.', [9]],
+  ] as const)('reads no other number in %j', (line, amends) => {
+    expect(header(line).amends).toEqual(amends)
+  })
+
+  it('reads the passive form and the mentions the same way', () => {
+    const document = parseAdr(
+      'docs/adr/0008-a.md',
+      '# 8. A\n\n- Amendée par les ADR 0031 et 0034.\n\n## Context\n\nSee ADR 0002 and 0003.\n'
+    )!
+    expect(document.amendedBy).toEqual([31, 34])
+    expect(document.mentions).toEqual([2, 3, 31, 34])
+  })
+})
+
 describe('a status written as a dated list', () => {
   const status = (markdown: string) => {
     const document = parseAdr('doc/adr/0010-cache.md', markdown)!
