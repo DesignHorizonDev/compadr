@@ -139,6 +139,18 @@ describe('parseUnifiedDiff', () => {
     ])
   })
 
+  it('keeps a character outside the basic plane of a quoted path', () => {
+    // With core.quotePath off, git quotes this path for its tab only.
+    const diff = [
+      String.raw`diff --git "a/src/😀\tx.ts" "b/src/😀\tx.ts"`,
+      'Binary files differ',
+      '',
+    ].join('\n')
+    expect(parseUnifiedDiff(diff).map(file => file.path)).toEqual([
+      'src/😀\tx.ts',
+    ])
+  })
+
   it('reads a quoted path in linear time', () => {
     const started = performance.now()
     parseUnifiedDiff(`diff --git a/x ${' "b/'.repeat(100_000)}\n`)

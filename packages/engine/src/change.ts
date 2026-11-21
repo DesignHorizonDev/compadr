@@ -54,9 +54,11 @@ export function unquoteGitPath(raw: string): string {
   const bytes: number[] = []
   const encoder = new TextEncoder()
   for (let i = 0; i < inner.length; i++) {
-    const char = inner[i]!
+    // A whole character: one outside the basic plane takes two units.
+    const char = String.fromCodePoint(inner.codePointAt(i)!)
     if (char !== '\\') {
       bytes.push(...encoder.encode(char))
+      i += char.length - 1
       continue
     }
     const octal = /^[0-3][0-7]{2}/.exec(inner.slice(i + 1, i + 4))
