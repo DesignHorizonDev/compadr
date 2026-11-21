@@ -430,3 +430,82 @@ describe('a list of decisions after one ADR prefix', () => {
     expect(document.mentions).toEqual([2, 3, 31, 34])
   })
 })
+
+describe('a status written as a dated list', () => {
+  const status = (markdown: string) => {
+    const document = parseAdr('doc/adr/0010-cache.md', markdown)!
+    return { rawStatus: document.rawStatus, status: document.status }
+  }
+
+  it('reads the latest state of a `## Status` list', () => {
+    expect(
+      status(
+        '# 10. Cache\n\n## Status\n\n- 2024-09-02: Drafted\n- 2024-09-09: Accepted\n- 2025-04-04: Edited (Added chronological status)\n\n## Context\n'
+      )
+    ).toEqual({ rawStatus: '2024-09-09: Accepted', status: 'accepted' })
+  })
+
+  it.each([
+    ['- 2024-03-12: Drafted\n- 2024-03-14: Merged', 'accepted'],
+    ['- 2024-06-04: Drafted\n- 2024-06-24: Approved', 'accepted'],
+    ['- 2026-04-07: Drafted\n- 2026-08-12: Rejected', 'rejected'],
+    ['- 2025-12-24: Drafted', 'proposed'],
+    ['- 2025-05-19: Drafted & Accepted', 'accepted'],
+    ['- 2025-11-11: Drafted\n- 2025-11-13: Edited & Accepted', 'accepted'],
+    [
+      '- 2025-05-19: Drafted & Accepted\n- 2026-11-05: Superseded by [ADR 0034](./0034-flow.md) (flows are compiled)',
+      'superseded',
+    ],
+    // A partial supersession leaves the decision in force.
+    [
+      '- 2024-10-31: Merged\n- 2026-11-05: Partially superseded by [ADR 0034](./0034-flow.md)',
+      'accepted',
+    ],
+    // The list is read by date, whatever its order.
+    ['- 2025-03-24: Accepted\n- 2024-10-22: Drafted', 'accepted'],
+    // Words between parentheses are a note, not a state.
+    ['- 2024-04-02: Drafted (not accepted yet)', 'proposed'],
+    // A sentence that starts with "Decided" is not a state.
+    ['- 2024-02-20: Drafted\n- 2024-03-01: Decided to wait', 'proposed'],
+  ] as const)('reads %j as %s', (list, expected) => {
+    expect(status(`# 10. Cache\n\n## Status\n\n${list}\n`).status).toBe(
+      expected
+    )
+  })
+
+  it('reads the superseding decisions of the latest state', () => {
+    const document = parseAdr(
+      'doc/adr/0023-config.md',
+      '# 23. Config\n\n## Status\n\n- 2025-05-19: Drafted & Accepted\n- 2026-11-05: Superseded by [ADR 0034](./0034-flow.md)\n'
+    )!
+    expect(document.supersededBy).toEqual([34])
+  })
+
+  it('reads dated lines of the header', () => {
+    expect(
+      status(
+        '# 29. Use pnpm\n\n2024-10-31: proposed\n2024-11-21: postponed to later\n2025-12-09: Accepted\n\n## Context\n'
+      )
+    ).toEqual({ rawStatus: '2025-12-09: Accepted', status: 'accepted' })
+  })
+
+  it('reads no state from a sentence of the header', () => {
+    expect(
+      status(
+        '# 10. Cache\n\n2024-01-01: Decided to use Postgres\n\n## Context\n'
+      ).status
+    ).toBe('unknown')
+  })
+
+  it('keeps a section that is not a dated list as it reads it', () => {
+    expect(status('# 10. Cache\n\n## Status\n\nAccepted\n').status).toBe(
+      'accepted'
+    )
+  })
+
+  it('leaves the status unknown when no entry gives a state', () => {
+    expect(
+      status('# 10. Cache\n\n## Status\n\n- 2025-04-04: Edited\n').status
+    ).toBe('unknown')
+  })
+})

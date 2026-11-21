@@ -10,13 +10,29 @@ export const DECISION_STATUSES = [
 export type DecisionStatus = (typeof DECISION_STATUSES)[number]
 
 // Keywords of each status, in English and in French. Log4brains `draft` counts
-// as proposed.
+// as proposed, and so does a decision that waits for a review ("Pending
+// review", "To be decided"). "Approved" and "Merged" (the pull request of
+// the record) count as accepted, and so does "Decided" on its own, at the
+// start of the text: "Decided to wait" and "Decided against" are sentences,
+// not a status. A keyword starts a word: "Undecided" and "Unapproved" give no
+// status.
 const STATUS_KEYWORDS: readonly [DecisionStatus, RegExp][] = [
   ['superseded', /supersed|remplac[ée]+ par/g],
   ['deprecated', /deprecat|obsol[eè]te/g],
   ['rejected', /reject|rejet/g],
-  ['proposed', /propos|draft|brouillon/g],
-  ['accepted', /accept/g],
+  [
+    'proposed',
+    /propos|draft|brouillon|(?<![a-z])pending|en attente|to be decided|[àa] d[ée]cider/g,
+  ],
+  [
+    'accepted',
+    /accept|(?<![a-z])(?:approved|approuv[ée]e?s?|merged)(?![a-z])/g,
+  ],
+  // Followed by the end, a punctuation mark, a date or "on 2024-03-01".
+  [
+    'accepted',
+    /^(?:decided|d[ée]cid[ée]e?s?)(?=[ \t]*(?:$|[.,;:([]|on\b|le\b|\d))/g,
+  ],
 ]
 
 // A keyword right after a negation does not give the status: "not accepted",
@@ -34,7 +50,7 @@ const NEGATION_REACH = 40
 export function normalizeStatus(
   raw: string | null | undefined
 ): DecisionStatus {
-  const text = (raw ?? '').toLowerCase()
+  const text = (raw ?? '').trim().toLowerCase()
   let best: { index: number; status: DecisionStatus } | null = null
   for (const [status, keyword] of STATUS_KEYWORDS) {
     const match = [...text.matchAll(keyword)].find(

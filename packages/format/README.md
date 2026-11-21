@@ -16,6 +16,8 @@ const record = parseAdr(path, readFileSync(path, 'utf8'))
 
 `parseAdr` returns the title, the status, the date, the relations and the `compadr:` fields of the record, or `null` when the file is not a record.
 
+The status comes from the frontmatter, a `Status:` line of the header or a `## Status` section. When the section holds a dated list of states (`- 2024-09-09: Accepted`), the latest state gives the status. "Approved", "Merged" and "Decided" on its own count as accepted, and "Pending" counts as proposed. A sentence such as "Decided to wait" gives no status.
+
 The JSON schemas are part of the package:
 
 | Schema | Content |

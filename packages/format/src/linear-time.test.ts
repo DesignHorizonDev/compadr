@@ -55,6 +55,30 @@ const hostile: [string, () => unknown][] = [
       ),
   ],
   [
+    'a dated status line of spaces',
+    () =>
+      parseAdr(
+        '0001-a.md',
+        `# T\n\n## Status\n\n- 2024-01-01${' '.repeat(N)}x\n`
+      ),
+  ],
+  [
+    'a dated status list of many entries',
+    () =>
+      parseAdr(
+        '0001-a.md',
+        `# T\n\n## Status\n\n${'- 2024-01-01: Drafted & Edited (a)\n'.repeat(N / 40)}`
+      ),
+  ],
+  [
+    'a dated entry of many steps',
+    () =>
+      parseAdr(
+        '0001-a.md',
+        `# T\n\n## Status\n\n- 2024-01-01: ${'(edited & '.repeat(N / 10)}\n`
+      ),
+  ],
+  [
     'a status of repeated negations',
     () => normalizeStatus('not accept '.repeat(N / 10)),
   ],

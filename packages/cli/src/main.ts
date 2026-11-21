@@ -1988,6 +1988,14 @@ async function assist(
   }
   const readRecord = (file: string) =>
     runGit(recordsRepository, 'show', [`${report.repository.commit}:${file}`])
+  // A path that a record cites whole is a file, or a folder that gives no
+  // excerpt.
+  const isFile = (path: string) =>
+    runGit(recordsRepository, 'ls-tree', [
+      report.repository.commit,
+      '--',
+      path,
+    ]).then(listing => /^\d+ blob /.test(listing))
   const request =
     kind === 'check'
       ? buildCheckRequest(report, diff)
@@ -1996,7 +2004,13 @@ async function assist(
         : kind === 'consolidate'
           ? await buildConsolidateRequest(report, decision!, readRecord)
           : kind === 'accept'
-            ? await buildAcceptRequest(report, decision!, readRecord)
+            ? await buildAcceptRequest(
+                report,
+                decision!,
+                readRecord,
+                {},
+                isFile
+              )
             : await buildPlainRequest(report, decision!, readRecord)
 
   const write = (value: unknown): number => {
