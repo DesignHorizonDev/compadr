@@ -613,3 +613,164 @@ describe('accept requests', () => {
     ])
   })
 })
+
+describe('check requests and the decisions that the diff cites', () => {
+  let repo: FixtureRepo
+  let report: DriftReport
+  const pool = Array.from({ length: 12 }, (_, i) => `const p${i + 1} = ${i}`)
+
+  beforeAll(async () => {
+    const heavy = (n: number) =>
+      [
+        `docs/adr/000${n}-heavy-${n}.md`,
+        record(
+          n,
+          `Heavy ${n}`,
+          ['Status: Accepted'],
+          `See \`src/db/pool.ts:1-2\`.`
+        ),
+      ] as const
+    repo = createFixtureRepo([
+      {
+        date: '2026-01-10T09:00:00Z',
+        files: {
+          ...Object.fromEntries([1, 2, 3].map(heavy)),
+          'docs/adr/0004-cap.md': record(
+            4,
+            'Cap',
+            ['Status: Accepted'],
+            'The cap lives in `src/db/cap.ts`.'
+          ),
+          'docs/adr/0005-old.md': record(
+            5,
+            'Old',
+            ['Status: Superseded by ADR-0004'],
+            'No cap.'
+          ),
+          'docs/adr/0006-format.md': record(
+            6,
+            'Format',
+            ['Status: Accepted'],
+            'Dates are written in UTC, in `src/time.ts`.'
+          ),
+          'src/db/pool.ts': `${pool.join('\n')}\n`,
+          'src/db/cap.ts': 'export const cap = 10\n',
+          'src/time.ts': 'export {}\n',
+        },
+      },
+    ])
+    report = await createDriftReport(repo.path, { generatorVersion: '0.0.0' })
+  })
+  afterAll(() => repo.remove())
+
+  const hunk = (lines: string[]) =>
+    [
+      'diff --git a/src/db/pool.ts b/src/db/pool.ts',
+      '--- a/src/db/pool.ts',
+      '+++ b/src/db/pool.ts',
+      '@@ -9,3 +9,4 @@',
+      ...lines,
+      '',
+    ].join('\n')
+
+  it('sends a decision that the diff cites before the heaviest links', () => {
+    const diff = hunk([
+      ' const p9 = 8',
+      '-const p10 = 9',
+      '+const p10 = 10 // keeps the cap (ADR 0004)',
+      '+// ADR-0005 and ADR-0099 are not in force',
+      ' const p11 = 10',
+    ])
+    const request = buildCheckRequest(report, diff, { maxDecisions: 2 })
+    expect(request.decisions.map(d => d.number)).toEqual([4, 1])
+    expect(request.decisions[0]).toMatchObject({
+      title: 'Cap',
+      status: 'accepted',
+      files: ['src/db/pool.ts'],
+      weight: 0,
+    })
+    expect(request.decisions[0]!.text).toContain('The cap lives')
+  })
+
+  it('reads the context lines of a hunk, but not the removed ones', () => {
+    const diff = hunk([
+      ' // Dates follow ADR 0006.',
+      '-const p10 = 9 // ADR-0004',
+      '+const p10 = 10',
+      ' const p11 = 10',
+    ])
+    const request = buildCheckRequest(report, diff, { maxDecisions: 2 })
+    expect(request.decisions.map(d => d.number)).toEqual([6, 1])
+  })
+})
+
+describe('accept requests and the code that the record cites', () => {
+  let repo: FixtureRepo
+  let report: DriftReport
+  const numbered = (count: number, at: Record<number, string> = {}) =>
+    Array.from(
+      { length: count },
+      (_, i) => at[i + 1] ?? `const x${i + 1} = ${i + 1}`
+    ).join('\n')
+  const read = (file: string) =>
+    Promise.resolve(repo.git('show', `HEAD:${file}`))
+
+  beforeAll(async () => {
+    repo = createFixtureRepo([
+      {
+        date: '2026-01-10T09:00:00Z',
+        files: {
+          'docs/adr/0001-flow.md': [
+            '# 1. Flow engine',
+            '',
+            'Status: Proposed',
+            '',
+            '## Decision',
+            '',
+            'Flows are compiled by `compileFlow`, in `src/flow/compile.ts`.',
+            'The pruner keeps the fields of `src/flow/prune.ts:60-70`.',
+            'The pages live in `src/pages/`.',
+            '',
+          ].join('\n'),
+          'src/flow/compile.ts': numbered(200, {
+            150: 'export function compileFlow() {',
+          }),
+          'src/flow/prune.ts': numbered(100),
+          'src/pages/a.ts': numbered(5),
+          'src/other.ts': numbered(5, { 2: '// ADR-0001' }),
+        },
+      },
+    ])
+    report = await createDriftReport(repo.path, { generatorVersion: '0.0.0' })
+  })
+  afterAll(() => repo.remove())
+
+  it('sends the code that the record cites, after the code that cites it', async () => {
+    const isFile = (path: string) =>
+      Promise.resolve(
+        repo.git('cat-file', '-t', `HEAD:${path}`).trim() === 'blob'
+      )
+    const request = await buildAcceptRequest(report, 1, read, {}, isFile)
+    expect(AssistRequestSchema.parse(request)).toEqual(request)
+    expect(
+      request.code.map(e => [e.path, e.startLine, e.text.split('\n').length])
+    ).toEqual([
+      ['src/other.ts', 1, 5],
+      // A cited file without lines gives its start, and a cited symbol its
+      // declaration, each with the window of a citation.
+      ['src/flow/compile.ts', 1, 31],
+      ['src/flow/compile.ts', 140, 41],
+      // Cited lines keep the same window around them. The folder gives nothing.
+      ['src/flow/prune.ts', 50, 51],
+    ])
+    expect(request.omittedFiles).toEqual([])
+
+    // Without isFile, a path cited whole gives nothing.
+    const plain = await buildAcceptRequest(report, 1, read)
+    expect(plain.code.map(e => [e.path, e.startLine])).toEqual([
+      ['src/other.ts', 1],
+      ['src/flow/compile.ts', 140],
+      ['src/flow/prune.ts', 50],
+    ])
+  })
+})
