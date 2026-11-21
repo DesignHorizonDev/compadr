@@ -400,6 +400,11 @@ describe('a list of decisions after one ADR prefix', () => {
     ],
     ['Amends ADRs 3 and 4.', [3, 4]],
     ['Amends ADR-0003, ADR-0004 & 0005.', [3, 4, 5]],
+    // Numbers without leading zeros grow by one digit.
+    ['Amends ADR 9, 10 and 11.', [9, 10, 11]],
+    // A comma before the last conjunction.
+    ['Amende les ADR 2, 3, ou 4.', [2, 3, 4]],
+    ['Amends ADRs 3, 4, and 5.', [3, 4, 5]],
   ] as const)('reads every decision of %j', (line, amends) => {
     expect(header(line).amends).toEqual(amends)
   })
@@ -409,6 +414,9 @@ describe('a list of decisions after one ADR prefix', () => {
     ["Complète l'ADR 0010 et 3 autres points.", [10]],
     ['Amends ADR 0010, 2026-10-21.', [10]],
     ['Amends ADR 12, 1.5 times the limit.', [12]],
+    // A smaller number of another width is not the next decision.
+    ['Amends ADR 10, 9 more points.', [10]],
+    ['Amends ADR 0009, 10 more points.', [9]],
   ] as const)('reads no other number in %j', (line, amends) => {
     expect(header(line).amends).toEqual(amends)
   })
