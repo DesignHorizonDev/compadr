@@ -18,9 +18,9 @@ export function parseYamlDocument(text: string): Document.Parsed {
       if (!isMap(map)) return
       const seen = new Set<unknown>()
       for (const pair of map.items) {
-        // Only scalar keys compare by value, as in the yaml library. A merge
-        // key may repeat.
-        if (!isScalar(pair.key) || pair.key.value === '<<') continue
+        // Scalar keys compare by value, other keys never, as in yaml 2.9.
+        // NaN differs from itself there: it never repeats.
+        if (!isScalar(pair.key) || Number.isNaN(pair.key.value)) continue
         if (seen.has(pair.key.value)) {
           const [start, end] = pair.key.range ?? [0, 0]
           document.errors.push(
@@ -35,6 +35,8 @@ export function parseYamlDocument(text: string): Document.Parsed {
       }
     },
   })
+  // The first error of the text comes first, as the library gives them.
+  document.errors.sort((a, b) => a.pos[0] - b.pos[0])
   return document
 }
 

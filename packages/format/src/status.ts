@@ -23,7 +23,8 @@ const STATUS_KEYWORDS: readonly [DecisionStatus, RegExp][] = [
 // "no longer accepted", "pas acceptée".
 const NEGATION = /\b(?:not|never|no longer|non|pas|jamais)\s+$/
 // The negation and its spaces sit in the few characters before the keyword:
-// reading only those keeps the reading linear in the length of the text.
+// reading only those keeps the reading linear in the length of the text. A
+// negation followed by more than about 30 spaces is no longer read.
 const NEGATION_REACH = 40
 
 /**

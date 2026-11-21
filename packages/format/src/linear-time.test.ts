@@ -10,6 +10,7 @@ import { parseAdr } from './parse-adr.ts'
 import { locateQuote, readDecisionText } from './record-text.ts'
 import { firstSentence } from './rule.ts'
 import { normalizeStatus } from './status.ts'
+import { parseYaml } from './yaml.ts'
 
 const N = 200_000
 const LIMIT_MS = 1_000
@@ -128,6 +129,57 @@ describe('reading a hostile text', () => {
       expect(timed(run)).toBeLessThan(LIMIT_MS)
     })
   }
+})
+
+describe('reading a run of links without a closing parenthesis', () => {
+  it('reads it in linear time', () => {
+    expect(
+      timed(() =>
+        firstSentence([
+          { heading: null, line: 1, markdown: '[a]('.repeat(N / 4) },
+        ])
+      )
+    ).toBeLessThan(LIMIT_MS)
+  })
+})
+
+describe('readings that changed', () => {
+  it('reads the inner link of a text that opens a bracket before it', () => {
+    expect(
+      firstSentence([
+        {
+          heading: null,
+          line: 1,
+          markdown: 'Use [pas [x](y) here for all calls.',
+        },
+      ])
+    ).toContain('[pas x here')
+  })
+
+  it('reads no quote that holds its own opening mark', () => {
+    const text = readDecisionText(
+      '# T\n\nThis replaces ADR-0001 « one « two three four five ».\n\n## Decision\n\nx\n'
+    )
+    expect(JSON.stringify(text)).not.toContain('one « two')
+  })
+
+  it('reads no negation beyond the spaces it can reach', () => {
+    expect(normalizeStatus(`not${' '.repeat(5)}accepted`)).toBe('unknown')
+    expect(normalizeStatus(`not${' '.repeat(50)}accepted`)).toBe('accepted')
+  })
+})
+
+describe('keys of a YAML map, as in yaml 2.9', () => {
+  it('refuses a merge key given twice, and accepts NaN twice', () => {
+    expect(() => parseYaml('<<: 1\n<<: 2\n')).toThrow('Map keys must be unique')
+    expect(parseYaml('.nan: 1\n.nan: 2\n')).toEqual({ NaN: 2 })
+  })
+
+  it('gives the first error of the text first', () => {
+    expect(() => parseYaml('b: 1\nb: 2\nc: [1\n')).toThrow(
+      'Map keys must be unique'
+    )
+  })
 })
 
 describe('readings kept as they were', () => {

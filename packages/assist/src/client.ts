@@ -201,9 +201,7 @@ export function httpAssistClient(
           response.status
         )
       }
-      // The texts of a suggestion reach a terminal, a file and a comment:
-      // no control character comes with them.
-      const parsed = AssistSuggestionSchema.safeParse(withoutControls(json))
+      const parsed = AssistSuggestionSchema.safeParse(json)
       if (!parsed.success) {
         throw new AssistServiceError(
           `the suggestion of the assist service does not follow the contract: ${oneLine(parsed.error.issues[0]?.message ?? '')}`,
@@ -216,7 +214,10 @@ export function httpAssistClient(
           response.status
         )
       }
-      return parsed.data
+      // The texts of a suggestion reach a terminal, a file and a comment:
+      // no control character comes with them. The walk follows the depth of
+      // the schema, not the depth of the answer.
+      return withoutControls(parsed.data) as AssistSuggestion
     },
   }
 }

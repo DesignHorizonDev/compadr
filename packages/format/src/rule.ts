@@ -52,8 +52,9 @@ export function isWeakRule(text: string): boolean {
 function plain(markdown: string): string {
   return (
     markdown
-      // The text of a link holds no bracket: a run of `[` is read once.
-      .replace(/\[([^[\]]+)\]\([^)]*\)/g, '$1')
+      // The text of a link holds no bracket and its target no parenthesis:
+      // a run of `[` or of `[a](` is read once.
+      .replace(/\[([^[\]]+)\]\([^()]*\)/g, '$1')
       .replace(/(\*\*|__)(.+?)\1/g, '$2')
       .replace(/(^|[^\w*])[*_]([^*_\s][^*_]*?)[*_](?=[^\w*]|$)/g, '$1$2')
       .replace(/\s+/g, ' ')

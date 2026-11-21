@@ -170,6 +170,17 @@ describe('httpAssistClient, on a hostile answer', () => {
     )
   })
 
+  it('refuses a deeply nested answer as an answer outside the contract', async () => {
+    for (const body of [
+      '['.repeat(1_000_000) + ']'.repeat(1_000_000),
+      '{"a":'.repeat(300_000) + '1' + '}'.repeat(300_000),
+    ]) {
+      await expect(
+        client(fetchAnswering(200, body)).suggest(request)
+      ).rejects.toBeInstanceOf(AssistServiceError)
+    }
+  })
+
   it('quotes an error body on one line', async () => {
     await expect(
       client(fetchAnswering(500, 'boom\n::error::forged\u001b[31m')).suggest(
