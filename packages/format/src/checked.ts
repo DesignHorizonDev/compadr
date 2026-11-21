@@ -12,7 +12,8 @@
 //
 // The key is the reference as the record cites it, between backticks. A
 // later change of the code raises the signal again.
-import { isMap, isScalar, parseDocument } from 'yaml'
+import { isMap, isScalar } from 'yaml'
+import { parseYamlDocument } from './yaml.ts'
 import { editFrontmatter, ensureMap } from './frontmatter-edit.ts'
 
 export interface CheckedReference {
@@ -51,7 +52,7 @@ export function checkedLines(markdown: string): Map<string, number> {
   const lines = new Map<string, number>()
   const source = FRONTMATTER.exec(markdown)?.[1]
   if (source === undefined) return lines
-  const document = parseDocument(source)
+  const document = parseYamlDocument(source)
   const entries = document.getIn(['compadr', 'checked'], true)
   if (!isMap(entries)) return lines
   for (const pair of entries.items) {

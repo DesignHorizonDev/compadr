@@ -50,12 +50,15 @@ export function isWeakRule(text: string): boolean {
 
 /** Markdown inline marks that a rule does not need: emphasis and links. */
 function plain(markdown: string): string {
-  return markdown
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-    .replace(/(\*\*|__)(.+?)\1/g, '$2')
-    .replace(/(^|[^\w*])[*_]([^*_\s][^*_]*?)[*_](?=[^\w*]|$)/g, '$1$2')
-    .replace(/\s+/g, ' ')
-    .trim()
+  return (
+    markdown
+      // The text of a link holds no bracket: a run of `[` is read once.
+      .replace(/\[([^[\]]+)\]\([^)]*\)/g, '$1')
+      .replace(/(\*\*|__)(.+?)\1/g, '$2')
+      .replace(/(^|[^\w*])[*_]([^*_\s][^*_]*?)[*_](?=[^\w*]|$)/g, '$1$2')
+      .replace(/\s+/g, ' ')
+      .trim()
+  )
 }
 
 /** The first paragraph of prose, or the first item of a list. */

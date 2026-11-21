@@ -1,7 +1,8 @@
 // Edits the YAML frontmatter of a decision record and keeps the rest of the
 // record, including the other keys of the frontmatter and their comments, as
 // written.
-import { isMap, isScalar, parseDocument, type Document } from 'yaml'
+import { isMap, isScalar, type Document } from 'yaml'
+import { parseYamlDocument } from './yaml.ts'
 
 export class FrontmatterEditError extends Error {}
 
@@ -35,7 +36,7 @@ export function editFrontmatter(
 ): string {
   const match = FRONTMATTER.exec(markdown)
   const newline = markdown.includes('\r\n') ? '\r\n' : '\n'
-  const document = parseDocument(match?.[1] ?? '')
+  const document = parseYamlDocument(match?.[1] ?? '')
   if (document.errors.length > 0) {
     throw new FrontmatterEditError(
       `the frontmatter is not valid YAML: ${document.errors[0]!.message}`

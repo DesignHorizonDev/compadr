@@ -2,8 +2,9 @@
 // `compadr.feature`, and a detail decision names the main decision of its
 // feature in `compadr.parent`. The glossary of the repository, `features.yml`
 // in the ADR folder, gives each feature its label and its main decision.
-import { isMap, parse as parseYaml, parseDocument } from 'yaml'
+import { isMap } from 'yaml'
 import { z } from 'zod'
+import { parseYaml, parseYamlDocument } from './yaml.ts'
 import {
   ConflictSchema,
   ConsolidatedRuleSchema,
@@ -150,7 +151,7 @@ export function writeFeatureGlossary(
   existing: string | null,
   features: readonly FeatureEntry[]
 ): string {
-  const document = parseDocument(existing ?? '')
+  const document = parseYamlDocument(existing ?? '')
   if (document.errors.length > 0) {
     throw new FeatureGlossaryError(
       `${FEATURE_GLOSSARY} is not valid YAML: ${document.errors[0]!.message}`
@@ -224,7 +225,7 @@ export function writeValidatedRules(
   feature: string,
   rules: ValidatedRules
 ): string {
-  const document = parseDocument(existing)
+  const document = parseYamlDocument(existing)
   if (document.errors.length > 0) {
     throw new FeatureGlossaryError(
       `${FEATURE_GLOSSARY} is not valid YAML: ${document.errors[0]!.message}`

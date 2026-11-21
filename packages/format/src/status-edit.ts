@@ -9,9 +9,26 @@ const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/
 const FRONTMATTER_STATUS = /^(status:[ \t]*)(.+?)[ \t]*$/m
 // The same lines as the parser reads, with the part before the value kept.
 const STATUS_LINE =
-  /^([ \t]*(?:[-*][ \t]+)?\**(?:Status|Statut)\**[ \t]*:[ \t]*\**[ \t]*)(\S.*?)(\**[ \t]*)$/im
+  /^([ \t]*(?:[-*][ \t]+)?\**(?:Status|Statut)\**[ \t]*:[ \t]*(?:\*+[ \t]*)?)(\S.*)$/im
 const STATUS_SECTION =
-  /^(## (?:Status|Statut)[ \t]*\r?\n(?:[ \t]*\r?\n)*[ \t]*)(\S.*?)([ \t]*)$/im
+  /^(## (?:Status|Statut)[ \t]*\r?\n(?:[ \t]*\r?\n)*[ \t]*)(\S.*)$/im
+
+/**
+ * A value and what closes it: its trailing spaces, and with `stars` the stars
+ * before them (`proposed**  ` → `proposed`, `**  `). The value keeps its first
+ * character. Read by hand: a lazy value followed by a trailing run takes
+ * quadratic time on a long run.
+ */
+function splitTrailing(
+  value: string,
+  stars: boolean
+): { value: string; after: string } {
+  const isSpace = (char: string | undefined) => char === ' ' || char === '\t'
+  let end = value.length
+  while (end > 1 && isSpace(value[end - 1])) end--
+  if (stars) while (end > 1 && value[end - 1] === '*') end--
+  return { value: value.slice(0, end), after: value.slice(end) }
+}
 const SECTION = /^## /m
 
 function checkProposed(value: string): void {
@@ -63,12 +80,8 @@ export function acceptRecordStatus(markdown: string, date: string): string {
   const header = markdown.slice(start, end)
   const line = STATUS_LINE.exec(header)
   if (line !== null) {
-    const [whole, before, value, after] = line as unknown as [
-      string,
-      string,
-      string,
-      string,
-    ]
+    const [whole, before, rest] = line as unknown as [string, string, string]
+    const { value, after } = splitTrailing(rest, true)
     checkProposed(value)
     const french = /statut/i.test(before) || /proposée/i.test(value)
     const replaced = `${before}${acceptedValue(value, french, date)}${after}`
@@ -80,12 +93,12 @@ export function acceptRecordStatus(markdown: string, date: string): string {
   }
   const sectionStatus = STATUS_SECTION.exec(markdown)
   if (sectionStatus !== null) {
-    const [whole, before, value, after] = sectionStatus as unknown as [
-      string,
+    const [whole, before, rest] = sectionStatus as unknown as [
       string,
       string,
       string,
     ]
+    const { value, after } = splitTrailing(rest, false)
     checkProposed(value)
     const french = /statut/i.test(before) || /proposée/i.test(value)
     return (

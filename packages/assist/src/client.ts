@@ -49,6 +49,64 @@ const LOCAL_HTTP =
 /** Length of an error body quoted in a message, at most. */
 const QUOTED_BODY = 300
 
+/**
+ * Size of an answer of the service, at most. A suggestion takes a few
+ * kilobytes: a larger answer is refused before it fills the memory.
+ */
+export const MAX_ANSWER_BYTES = 4 * 1024 * 1024
+
+// Control characters: C0, DEL and C1. A terminal reads ESC and the C1 codes
+// as commands, and a line break would let a text start a line of its own,
+// such as a GitHub workflow command (`::error::`).
+// eslint-disable-next-line no-control-regex -- these characters are the point
+const CONTROLS = /[\u0000-\u001f\u007f-\u009f]+/g
+// eslint-disable-next-line no-control-regex -- these characters are the point
+const CONTROLS_BUT_BREAKS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g
+
+/** A text of the service on one line: each run of control characters becomes a space. */
+export function oneLine(text: string): string {
+  return text.replace(CONTROLS, ' ')
+}
+
+/** Each string of a value without control characters, line breaks and tabs kept. */
+function withoutControls(value: unknown): unknown {
+  if (typeof value === 'string')
+    return value.replace(CONTROLS_BUT_BREAKS, '\ufffd')
+  if (Array.isArray(value)) return value.map(withoutControls)
+  if (typeof value === 'object' && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, withoutControls(item)])
+    )
+  }
+  return value
+}
+
+/** The body of an answer, refused beyond MAX_ANSWER_BYTES. */
+async function readBody(response: Response): Promise<string> {
+  const tooLarge = () =>
+    new Error(`the answer is larger than ${MAX_ANSWER_BYTES} bytes`)
+  const announced = Number(response.headers.get('content-length'))
+  if (Number.isFinite(announced) && announced > MAX_ANSWER_BYTES) {
+    await response.body?.cancel()
+    throw tooLarge()
+  }
+  if (response.body === null) return ''
+  const reader = (response.body as ReadableStream<Uint8Array>).getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    size += value.byteLength
+    if (size > MAX_ANSWER_BYTES) {
+      await reader.cancel()
+      throw tooLarge()
+    }
+    chunks.push(value)
+  }
+  return Buffer.concat(chunks).toString('utf8')
+}
+
 /** The reason of the 402 that the service gives at the cap, or null. */
 function capOf(body: string): string | null {
   try {
@@ -56,7 +114,7 @@ function capOf(body: string): string | null {
     return typeof answer.error === 'string' &&
       typeof answer.used === 'number' &&
       typeof answer.cap === 'number'
-      ? answer.error.slice(0, QUOTED_BODY)
+      ? oneLine(answer.error.slice(0, QUOTED_BODY))
       : null
   } catch {
     return null
@@ -105,17 +163,17 @@ export function httpAssistClient(
         })
       } catch (error) {
         throw new AssistServiceError(
-          `the assist service did not answer: ${(error as Error).message}`
+          `the assist service did not answer: ${oneLine((error as Error).message)}`
         )
       }
       let body: string
       try {
         // The time limit also covers the body: a service may send its
         // headers and then stop.
-        body = await response.text()
+        body = await readBody(response)
       } catch (error) {
         throw new AssistServiceError(
-          `the answer of the assist service could not be read: ${(error as Error).message}`,
+          `the answer of the assist service could not be read: ${oneLine((error as Error).message)}`,
           response.status
         )
       }
@@ -130,7 +188,7 @@ export function httpAssistClient(
       }
       if (!response.ok) {
         throw new AssistServiceError(
-          `the assist service answered ${response.status}: ${body.slice(0, QUOTED_BODY)}`,
+          `the assist service answered ${response.status}: ${oneLine(body.slice(0, QUOTED_BODY))}`,
           response.status
         )
       }
@@ -143,10 +201,12 @@ export function httpAssistClient(
           response.status
         )
       }
-      const parsed = AssistSuggestionSchema.safeParse(json)
+      // The texts of a suggestion reach a terminal, a file and a comment:
+      // no control character comes with them.
+      const parsed = AssistSuggestionSchema.safeParse(withoutControls(json))
       if (!parsed.success) {
         throw new AssistServiceError(
-          `the suggestion of the assist service does not follow the contract: ${parsed.error.issues[0]?.message ?? ''}`,
+          `the suggestion of the assist service does not follow the contract: ${oneLine(parsed.error.issues[0]?.message ?? '')}`,
           response.status
         )
       }
@@ -241,10 +301,10 @@ export function httpAssistUsage(
         },
         signal: AbortSignal.timeout(timeoutMs),
       })
-      body = await response.text()
+      body = await readBody(response)
     } catch (error) {
       throw new AssistServiceError(
-        `the assist service did not answer: ${(error as Error).message}`
+        `the assist service did not answer: ${oneLine((error as Error).message)}`
       )
     }
     let json: unknown = null
@@ -256,7 +316,7 @@ export function httpAssistUsage(
     if (!response.ok) {
       const reason = (json as { error?: unknown } | null)?.error
       throw new AssistServiceError(
-        `the assist service answered ${response.status}: ${typeof reason === 'string' ? reason : body.slice(0, QUOTED_BODY)}`,
+        `the assist service answered ${response.status}: ${oneLine(typeof reason === 'string' ? reason.slice(0, QUOTED_BODY) : body.slice(0, QUOTED_BODY))}`,
         response.status
       )
     }

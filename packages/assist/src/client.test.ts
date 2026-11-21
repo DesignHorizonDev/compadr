@@ -6,6 +6,8 @@ import {
   AssistServiceError,
   httpAssistClient,
   httpAssistUsage,
+  MAX_ANSWER_BYTES,
+  oneLine,
 } from './client.ts'
 import { fakeAssistClient } from './fake.ts'
 
@@ -131,6 +133,55 @@ describe('httpAssistClient', () => {
     const error = await client.suggest(request).catch((e: unknown) => e)
     expect(error).toBeInstanceOf(AssistServiceError)
     expect((error as Error).message).toContain('could not be read')
+  })
+})
+
+describe('httpAssistClient, on a hostile answer', () => {
+  const client = (fetch: typeof globalThis.fetch) =>
+    httpAssistClient({ url: 'https://assist.test', token: 't', fetch })
+
+  it('refuses an answer larger than the limit, announced or not', async () => {
+    const big = 'x'.repeat(MAX_ANSWER_BYTES + 1)
+    const announced = (() =>
+      Promise.resolve(
+        new Response('{}', {
+          status: 200,
+          headers: { 'content-length': String(MAX_ANSWER_BYTES + 1) },
+        })
+      )) as typeof globalThis.fetch
+    for (const fetch of [fetchAnswering(200, big), announced]) {
+      await expect(client(fetch).suggest(request)).rejects.toThrow(
+        `the answer is larger than ${MAX_ANSWER_BYTES} bytes`
+      )
+    }
+  })
+
+  it('keeps the control characters of an answer out of its texts', async () => {
+    const suggestion = await fakeAssistClient().suggest(request)
+    const hostile = JSON.parse(JSON.stringify(suggestion)) as {
+      provenance: { model: string }
+    }
+    hostile.provenance.model = 'model\u001b]0;title\u0007\u001b[2J\u009b31m'
+    const read = await client(
+      fetchAnswering(200, JSON.stringify(hostile))
+    ).suggest(request)
+    expect(read.provenance.model).toBe(
+      'model\ufffd]0;title\ufffd\ufffd[2J\ufffd31m'
+    )
+  })
+
+  it('quotes an error body on one line', async () => {
+    await expect(
+      client(fetchAnswering(500, 'boom\n::error::forged\u001b[31m')).suggest(
+        request
+      )
+    ).rejects.toThrow(
+      'the assist service answered 500: boom ::error::forged [31m'
+    )
+  })
+
+  it('writes a text on one line', () => {
+    expect(oneLine('a\r\n::add-mask::b\tc')).toBe('a ::add-mask::b c')
   })
 })
 

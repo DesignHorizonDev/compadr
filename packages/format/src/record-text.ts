@@ -1,7 +1,7 @@
 // The parts of a decision record that make up the rules in force of a
 // feature: the header lines that link it to older decisions, the subsections
 // of its decision, and the rules of older decisions that it replaces.
-import { findAdrNumbers } from './adr-reference.ts'
+import { findAdrNumbers, findAdrReferences } from './adr-reference.ts'
 import { AMENDED_BY, AMENDS, REPLACES } from './relation-words.ts'
 
 export interface DecisionSection {
@@ -35,8 +35,11 @@ const DECISION_HEADING =
 const FENCE = /^[ \t]*(?:```|~~~)/
 const LIST_ITEM = /^(?:[-*+]|\d+[.)])[ \t]+/
 const STATUS_OR_DATE = /^(?:[-*][ \t]+)?\**(?:status|statut|date)\**[ \t]*:/i
-// «Rule», “rule” or "rule". A French quote keeps its inner spaces.
-const QUOTE = /«\s*([^»]+?)\s*»|“([^”]+)”|"([^"\n]+)"/g
+// «Rule», “rule” or "rule". A French quote keeps its inner spaces. A quote
+// never holds its own opening mark, and no two runs of spaces sit side by
+// side: each line is read in linear time.
+const QUOTE =
+  /«[ \t]*([^«»\s](?:[^«»\n]*[^«»\s])?)[ \t]*»|“([^“”\n]+)”|"([^"\n]+)"/g
 
 const MIN_RULE_WORDS = 4
 
@@ -80,24 +83,36 @@ function headerItems(lines: readonly string[]): string[] {
 
 function quotedRules(item: string): QuotedRule[] {
   const rules: QuotedRule[] = []
+  // Read once for the whole item: what comes before each quote is a prefix,
+  // and reading it again for each quote would take quadratic time.
+  const replaces = REPLACES.exec(item)
+  const replacesEnd =
+    replaces === null ? Infinity : replaces.index + replaces[0].length
+  const numbers = findAdrReferences(item)
+  // The numbers before the current quote: the quotes come in order.
+  const before: number[] = []
+  let next = 0
   let offset = 0
   for (const line of item.split('\n')) {
+    let inLine: number[] | null = null
+    let lineFrom = 0
     for (const match of line.matchAll(QUOTE)) {
-      const before = item.slice(0, offset + match.index)
+      const at = offset + match.index
       const quote = (match[1] ?? match[2] ?? match[3]!).trim()
       // A quote of a few words names a term or a section, not a rule.
-      if (
-        !REPLACES.test(before) ||
-        quote.split(/\s+/).length < MIN_RULE_WORDS
-      ) {
+      if (replacesEnd > at || quote.split(/\s+/).length < MIN_RULE_WORDS) {
         continue
       }
-      const inLine = findAdrNumbers(line.slice(0, match.index))
+      // The numbers of the line before the quote, read on from the last one.
+      inLine ??= []
+      inLine.push(...findAdrNumbers(line.slice(lineFrom, match.index)))
+      lineFrom = match.index
+      while (next < numbers.length && numbers[next]!.end <= at) {
+        before.push(numbers[next++]!.number)
+      }
       rules.push({
         quote,
-        decisions: [
-          ...new Set(inLine.length > 0 ? inLine : findAdrNumbers(before)),
-        ],
+        decisions: [...new Set(inLine.length > 0 ? inLine : before)],
       })
     }
     offset += line.length + 1
@@ -243,8 +258,13 @@ export function locateQuote(
     .filter(part => part !== '')
   if (parts.length === 0) return null
 
-  // Each start of the first part that the other parts follow, in order.
-  const matches: { start: number; end: number }[] = []
+  // Each start of the first part that the other parts follow, in order. A
+  // later start never ends earlier, so each part keeps the place where it
+  // was last found: the text is searched once per part, not once per start.
+  const rest = parts.slice(1)
+  const found = rest.map(() => -1)
+  // Starts that reach the same end are one occurrence: keep the closest.
+  const occurrences = new Map<number, number>()
   const first = parts[0]!
   for (
     let at = source.text.indexOf(first);
@@ -252,19 +272,19 @@ export function locateQuote(
     at = source.text.indexOf(first, at + 1)
   ) {
     let end = at + first.length
-    for (const part of parts.slice(1)) {
-      const next = source.text.indexOf(part, end)
-      if (next === -1) {
+    for (const [i, part] of rest.entries()) {
+      if (found[i]! < end) found[i] = source.text.indexOf(part, end)
+      if (found[i] === -1) {
         end = -1
         break
       }
-      end = next + part.length
+      end = found[i]! + part.length
     }
-    if (end !== -1) matches.push({ start: at, end })
+    // A part that no longer appears ends every later start too.
+    if (end === -1) break
+    occurrences.set(end, at)
+    if (occurrences.size > 1) return null
   }
-  // Starts that reach the same end are one occurrence: keep the closest.
-  const occurrences = new Map<number, number>()
-  for (const match of matches) occurrences.set(match.end, match.start)
   if (occurrences.size !== 1) return null
   const [end, start] = [...occurrences][0]!
   return {

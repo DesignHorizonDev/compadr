@@ -8,8 +8,8 @@
 //     semantic: true
 //     exclude:
 //       - config/secrets/
-import { parse as parseYaml } from 'yaml'
 import { normalizeRepositoryPath } from './file-decisions.ts'
+import { parseYaml } from './yaml.ts'
 
 /** Name of the settings file, in the ADR folder. */
 export const COMPADR_CONFIG = 'compadr.yml'

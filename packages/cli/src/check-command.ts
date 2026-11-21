@@ -3,7 +3,7 @@
 import type { CheckProblem } from '@compadr/engine'
 import type { DriftReport } from '@compadr/format'
 import type { checkChange } from '@compadr/engine'
-import type { SemanticCheck } from '@compadr/assist'
+import { oneLine, type SemanticCheck } from '@compadr/assist'
 
 export const CHECK_FORMATS = ['text', 'github'] as const
 export type CheckFormat = (typeof CHECK_FORMATS)[number]
@@ -180,7 +180,10 @@ export function semanticNotices(check: SemanticCheck): CheckProblem[] {
       decision: finding.decision,
       file: finding.evidence.path,
       line: finding.line,
-      message: `${adr} (${finding.title}) ${verdict}: "${finding.quote}". ${finding.explanation}${unverified}`,
+      // A text of the model stays on the line of its notice.
+      message: oneLine(
+        `${adr} (${finding.title}) ${verdict}: "${finding.quote}". ${finding.explanation}${unverified}`
+      ),
       key: `semantic-${finding.verdict}:${pad(finding.decision)}:${finding.evidence.path}`,
     }
   })
@@ -192,10 +195,12 @@ export function formatSemanticCheck(
   format: CheckFormat
 ): string[] {
   if (check.status === 'skipped') {
-    return [`◇ Semantic check skipped: ${check.reason}`]
+    return [`◇ Semantic check skipped: ${oneLine(check.reason)}`]
   }
   if (check.status === 'failed') {
-    return [`◇ Semantic check failed, the result above stands: ${check.reason}`]
+    return [
+      `◇ Semantic check failed, the result above stands: ${oneLine(check.reason)}`,
+    ]
   }
   const notices = semanticNotices(check)
   const count = `${notices.length} possible break${notices.length === 1 ? '' : 's'}`

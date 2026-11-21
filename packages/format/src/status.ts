@@ -22,6 +22,9 @@ const STATUS_KEYWORDS: readonly [DecisionStatus, RegExp][] = [
 // A keyword right after a negation does not give the status: "not accepted",
 // "no longer accepted", "pas acceptée".
 const NEGATION = /\b(?:not|never|no longer|non|pas|jamais)\s+$/
+// The negation and its spaces sit in the few characters before the keyword:
+// reading only those keeps the reading linear in the length of the text.
+const NEGATION_REACH = 40
 
 /**
  * Reads the status of a decision from its raw text. The first keyword of the
@@ -34,7 +37,10 @@ export function normalizeStatus(
   let best: { index: number; status: DecisionStatus } | null = null
   for (const [status, keyword] of STATUS_KEYWORDS) {
     const match = [...text.matchAll(keyword)].find(
-      m => !NEGATION.test(text.slice(0, m.index))
+      m =>
+        !NEGATION.test(
+          text.slice(Math.max(0, m.index - NEGATION_REACH), m.index)
+        )
     )
     if (match && (best === null || match.index < best.index)) {
       best = { index: match.index, status }
