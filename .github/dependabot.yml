@@ -1,0 +1,37 @@
+# Dependabot follows the GitHub actions and the npm packages: a pinned
+# dependency (SHA, lockfile) does not update itself.
+#
+# Each pull request runs a full CI round, so the period is monthly and at most
+# two pull requests stay open per ecosystem. Security fixes arrive as soon as
+# they are published, whatever the period. Dependabot does not rebase a pull
+# request on each push to main, which would run the CI again.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    rebase-strategy: disabled
+
+  # npm packages of every workspace (Yarn 4, a single lockfile at the root).
+  # Minor and patch versions arrive grouped in two pull requests, one for
+  # runtime and one for development. A major version has its own pull request.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    rebase-strategy: disabled
+    groups:
+      runtime:
+        dependency-type: production
+        update-types: [minor, patch]
+      development:
+        dependency-type: development
+        update-types: [minor, patch]
+    ignore:
+      # The types follow the Node major version, which changes by hand with
+      # .nvmrc, `engines` and setup-node.
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]

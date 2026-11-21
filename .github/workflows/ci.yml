@@ -1,0 +1,92 @@
+name: Checks
+
+# A single job: GitHub bills each job rounded up to the next minute.
+# A new check is added as a step, never as a job.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_call:
+
+# The CI token only reads the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, types, tests, licenses, build
+    runs-on: ubuntu-latest
+    # Draft pull requests do not use CI minutes.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The publication check reads the commit addresses of the history.
+          fetch-depth: 0
+          # No step pushes: the token does not stay in .git/config.
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Enable Yarn 4
+        run: corepack enable
+
+      - name: Yarn cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.yarn/berry/cache
+          key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          restore-keys: yarn-${{ runner.os }}-
+
+      - name: Install
+        run: yarn install --immutable
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Types
+        run: yarn typecheck
+
+      - name: Tests
+        run: |
+          yarn test
+          yarn test:tools
+
+      - name: Dependency licenses
+        run: yarn check:licenses
+
+      - name: License boundary between packages
+        run: yarn check:boundary
+
+      # Runtime dependencies carry no known high or critical vulnerability.
+      - name: Known vulnerabilities in runtime dependencies
+        run: yarn npm audit --all --recursive --environment production --severity high
+
+      - name: Nothing private in the repository
+        run: yarn check:publication
+
+      - name: Build
+        run: yarn build
+
+      - name: Guard — the built CLI runs and reports its version
+        run: |
+          expected=$(node -p "require('./packages/cli/package.json').version")
+          actual=$(node packages/cli/dist/cli.js --version)
+          [ "$actual" = "$expected" ] || { echo "::error::compadr --version printed '$actual', expected '$expected'"; exit 1; }
+          echo "✔ compadr $actual"
+
+      - name: Smoke test — the built CLI reads the symbols and serves MCP
+        run: yarn workspace @compadr/cli smoke
+
+      # The archives that a release publishes on npm: each one carries the license of
+      # every package that its bundle includes.
+      - name: Archives — each published package carries its licenses
+        run: node tools/pack.mjs "$RUNNER_TEMP/packs"

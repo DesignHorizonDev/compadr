@@ -1,0 +1,55 @@
+{
+  "name": "@compadr/cli",
+  "private": true,
+  "version": "0.4.0",
+  "description": "Keep architecture decision records (ADRs) true to the code: drift report, check in CI, and an MCP server for coding agents.",
+  "keywords": [
+    "adr",
+    "architecture-decision-records",
+    "architecture",
+    "documentation",
+    "drift",
+    "mcp",
+    "model-context-protocol",
+    "coding-agents",
+    "ci"
+  ],
+  "homepage": "https://compadr.io",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DesignHorizonDev/compadr.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/DesignHorizonDev/compadr/issues",
+    "email": "contact@compadr.io"
+  },
+  "author": "Design Horizon & Development (https://compadr.io)",
+  "license": "FSL-1.1-ALv2",
+  "type": "module",
+  "exports": {
+    "./drafts": "./src/drafts.ts"
+  },
+  "bin": {
+    "compadr": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "smoke": "node scripts/smoke-test.mjs"
+  },
+  "devDependencies": {
+    "tsup": "^9.0.0",
+    "typescript": "~5.9.0",
+    "vite": "^8.0.0",
+    "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "@compadr/assist": "workspace:*",
+    "@compadr/engine": "workspace:*",
+    "@compadr/format": "workspace:*",
+    "@compadr/mcp": "workspace:*",
+    "yaml": "^2.8.1"
+  }
+}

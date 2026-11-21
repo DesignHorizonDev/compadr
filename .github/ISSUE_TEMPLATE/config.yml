@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security problem
+    url: https://github.com/DesignHorizonDev/compadr/security/advisories/new
+    about: Report a vulnerability privately.
+  - name: Documentation
+    url: https://compadr.io/docs/
+    about: The documentation of the command line, the MCP server and the console.

@@ -1,0 +1,476 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "check"
+        },
+        "schemaVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "commit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "adrDir": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "commit",
+            "adrDir"
+          ],
+          "additionalProperties": false
+        },
+        "memoryCard": {
+          "type": "string"
+        },
+        "decisions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "number": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999
+              },
+              "title": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "proposed",
+                  "accepted",
+                  "rejected",
+                  "deprecated",
+                  "superseded",
+                  "unknown"
+                ]
+              },
+              "rule": {
+                "type": "string"
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Changed files that the decision applies to"
+              },
+              "weight": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Sum of the weights of its links to the changed files"
+              },
+              "text": {
+                "type": "string",
+                "description": "Decision section of the record, as Markdown; empty when the report has none"
+              },
+              "truncated": {
+                "type": "boolean",
+                "description": "True when the text was cut to the budget of the request"
+              }
+            },
+            "required": [
+              "number",
+              "title",
+              "status",
+              "files",
+              "weight",
+              "text",
+              "truncated"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "signals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "level": {
+                "type": "string",
+                "enum": [
+                  "broken",
+                  "review"
+                ]
+              },
+              "decision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "type",
+              "level",
+              "decision",
+              "path"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "diff": {
+          "type": "string",
+          "description": "Unified diff, without documentation, lock files, generated code or the content of deleted files"
+        },
+        "omittedFiles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Changed files left out of the diff to keep within its budget"
+        }
+      },
+      "required": [
+        "kind",
+        "schemaVersion",
+        "repository",
+        "memoryCard",
+        "decisions",
+        "signals",
+        "diff",
+        "omittedFiles"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "consolidate"
+        },
+        "schemaVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "commit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "adrDir": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "commit",
+            "adrDir"
+          ],
+          "additionalProperties": false
+        },
+        "decision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9999,
+          "description": "Decision whose chain is consolidated"
+        },
+        "records": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "number": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999
+              },
+              "file": {
+                "type": "string",
+                "minLength": 1
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "number",
+              "file",
+              "text"
+            ],
+            "additionalProperties": false
+          },
+          "description": "The chain of amendments, by number"
+        },
+        "omittedRecords": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9999
+          },
+          "description": "Records of the chain left out to keep within the budget"
+        }
+      },
+      "required": [
+        "kind",
+        "schemaVersion",
+        "repository",
+        "decision",
+        "records",
+        "omittedRecords"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "plain"
+        },
+        "schemaVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "commit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "adrDir": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "commit",
+            "adrDir"
+          ],
+          "additionalProperties": false
+        },
+        "record": {
+          "type": "object",
+          "properties": {
+            "number": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9999
+            },
+            "file": {
+              "type": "string",
+              "minLength": 1
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "number",
+            "file",
+            "text"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "kind",
+        "schemaVersion",
+        "repository",
+        "record"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "draft"
+        },
+        "schemaVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "commit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "adrDir": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "commit",
+            "adrDir"
+          ],
+          "additionalProperties": false
+        },
+        "memoryCard": {
+          "type": "string"
+        },
+        "nextNumber": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9999
+        },
+        "diff": {
+          "type": "string",
+          "description": "Unified diff, without documentation, lock files, generated code or the content of deleted files"
+        },
+        "omittedFiles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Changed files left out of the diff to keep within its budget"
+        }
+      },
+      "required": [
+        "kind",
+        "schemaVersion",
+        "repository",
+        "memoryCard",
+        "nextNumber",
+        "diff",
+        "omittedFiles"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "accept"
+        },
+        "schemaVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "commit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "adrDir": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "commit",
+            "adrDir"
+          ],
+          "additionalProperties": false
+        },
+        "record": {
+          "type": "object",
+          "properties": {
+            "number": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9999
+            },
+            "file": {
+              "type": "string",
+              "minLength": 1
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "number",
+            "file",
+            "text"
+          ],
+          "additionalProperties": false,
+          "description": "The proposed decision"
+        },
+        "code": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "startLine": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path",
+              "startLine",
+              "text"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Excerpts of the files of the code that cite the decision"
+        },
+        "omittedFiles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Files that cite the decision, left out to keep within the budget"
+        }
+      },
+      "required": [
+        "kind",
+        "schemaVersion",
+        "repository",
+        "record",
+        "code",
+        "omittedFiles"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+# Generated files: GitHub folds them in the diff of a pull request.
+packages/format/schema/*.schema.json linguist-generated=true
+packages/tokens/css/tokens.css linguist-generated=true
+yarn.lock linguist-generated=true

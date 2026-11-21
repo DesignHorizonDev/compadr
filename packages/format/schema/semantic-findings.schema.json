@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "repository": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "adrDir": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "commit",
+        "adrDir"
+      ],
+      "additionalProperties": false,
+      "description": "Repository and commit of the change"
+    },
+    "base": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Commit that the change starts from, with --base; null for --diff"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+    },
+    "model": {
+      "type": "string"
+    },
+    "promptVersion": {
+      "type": "string"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9999
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "violated",
+              "at-risk"
+            ]
+          },
+          "quote": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Passage of the decision text that states the rule, copied word for word"
+          },
+          "evidence": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "text": {
+                "type": "string",
+                "description": "Line or lines of the diff"
+              }
+            },
+            "required": [
+              "path",
+              "text"
+            ],
+            "additionalProperties": false
+          },
+          "explanation": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "description": "Title of the decision"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Line of evidence.path in the new file, when the diff adds it"
+          },
+          "notices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What the guard could not verify, for the reviewer to weigh"
+          }
+        },
+        "required": [
+          "decision",
+          "verdict",
+          "quote",
+          "evidence",
+          "explanation",
+          "title",
+          "line",
+          "notices"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "rejected": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991,
+      "description": "Findings that the guard removed"
+    },
+    "excluded": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Changed files that compadr.yml kept from the service"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "repository",
+    "base",
+    "generatedAt",
+    "model",
+    "promptVersion",
+    "findings",
+    "rejected",
+    "excluded"
+  ],
+  "additionalProperties": false,
+  "title": "Compadr semantic findings",
+  "description": "Findings of the assist service on one change, after the guard of Compadr. Each one is a suggestion for a person to review."
+}

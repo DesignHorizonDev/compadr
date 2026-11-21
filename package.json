@@ -1,0 +1,45 @@
+{
+  "name": "compadr",
+  "private": true,
+  "type": "module",
+  "packageManager": "yarn@4.17.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "dependenciesMeta": {
+    "esbuild": {
+      "built": true
+    }
+  },
+  "scripts": {
+    "lint": "eslint --cache --cache-strategy content . && prettier --check .",
+    "format": "prettier --write .",
+    "typecheck": "yarn workspaces foreach -Apt run typecheck",
+    "test": "yarn workspaces foreach -Apt run test",
+    "test:tools": "node --test tools/*.test.mjs",
+    "build": "yarn workspaces foreach -Apt run build",
+    "check:licenses": "node tools/check-licenses.mjs",
+    "check:boundary": "node tools/check-license-boundary.mjs",
+    "check:publication": "node tools/check-publication.mjs",
+    "check": "yarn lint && yarn typecheck && yarn test && yarn test:tools && yarn check:boundary && yarn build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@types/node": "^24.13.0",
+    "eslint": "^9.39.0",
+    "eslint-config-prettier": "^10.1.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "license-checker-rseidelsohn": "5.0.1",
+    "prettier": "^3.9.10",
+    "typescript": "~5.9.0",
+    "typescript-eslint": "^8.71.2"
+  },
+  "resolutions": {
+    "minimatch": "^11.0.1",
+    "glob": "^14.0.2"
+  }
+}

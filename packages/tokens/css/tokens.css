@@ -1,0 +1,42 @@
+/* Generated from packages/tokens/src/tokens.ts. Do not edit. */
+:root {
+  --compadr-ink: #0E1726;
+  --compadr-vermilion: #E14B2D;
+  --compadr-cobalt: #2B4ACB;
+  --compadr-ochre: #D9A21B;
+  --compadr-paper: #F6F4EF;
+  --compadr-canvas: #F5F6F8;
+  --compadr-surface: #FFFFFF;
+  --compadr-surface-subtle: #FAFBFC;
+  --compadr-selected: #EEF1FB;
+  --compadr-border: #E4E7EC;
+  --compadr-border-subtle: #F0F2F5;
+  --compadr-border-strong: #D0D5DD;
+  --compadr-text: #101828;
+  --compadr-text-secondary: #344054;
+  --compadr-text-tertiary: #475467;
+  --compadr-text-muted: #667085;
+  --compadr-text-faint: #98A2B3;
+  --compadr-state-in-sync: #1F7A4D;
+  --compadr-state-in-sync-bg: #E3F1EA;
+  --compadr-state-in-sync-text: #1F6B4A;
+  --compadr-state-review: #B7791F;
+  --compadr-state-review-bg: #FBF1D8;
+  --compadr-state-review-text: #8A5A0E;
+  --compadr-state-broken: #C2342A;
+  --compadr-state-broken-bg: #FBE4DE;
+  --compadr-state-broken-text: #A8321C;
+  --compadr-state-order: #2B4ACB;
+  --compadr-state-order-bg: #EEF1FB;
+  --compadr-state-order-text: #2B4ACB;
+  --compadr-state-info: #667085;
+  --compadr-state-info-bg: #F0F2F5;
+  --compadr-state-info-text: #475467;
+  --compadr-font-sans: 'Geist Variable', 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --compadr-font-mono: 'Geist Mono Variable', 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --compadr-radius-sm: 5px;
+  --compadr-radius-md: 8px;
+  --compadr-radius-lg: 10px;
+  --compadr-radius-xl: 12px;
+  --compadr-radius-full: 999px;
+}

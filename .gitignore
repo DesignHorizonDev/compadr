@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+.pnp.*
+
+# Yarn
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+
+# Builds
+dist/
+packs/
+*.tsbuildinfo
+.eslintcache
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Tests
+coverage/
+
+# System
+.DS_Store
+Thumbs.db
+*.log
+
+# Editors and IDEs, local to each workstation
+.vscode/
+.idea/
+.fleet/
+.zed/
+*.swp
+*~
+
+# AI assistants and agents, local to each workstation
+.claude/
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+.cursor/
+.cursorrules
+.windsurf/
+.aider*
+.codex/
+.github/copilot-instructions.md

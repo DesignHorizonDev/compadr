@@ -1,0 +1,27 @@
+{
+  "name": "@compadr/mcp",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Compadr local MCP server: the decisions of a repository for coding agents.",
+  "license": "FSL-1.1-ALv2",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.0",
+    "vite": "^8.0.0",
+    "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "@compadr/assist": "workspace:*",
+    "@compadr/engine": "workspace:*",
+    "@compadr/format": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
+  }
+}

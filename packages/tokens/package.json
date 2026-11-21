@@ -1,0 +1,26 @@
+{
+  "name": "@compadr/tokens",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Compadr design tokens: brand, neutral and state colors, fonts, radii, logo and favicon.",
+  "license": "LicenseRef-FCL-1.0-ALv2",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tokens.css": "./css/tokens.css",
+    "./logo-light.svg": "./assets/logo-light.svg",
+    "./logo-dark.svg": "./assets/logo-dark.svg",
+    "./favicon.svg": "./assets/favicon.svg"
+  },
+  "scripts": {
+    "css": "node scripts/write-css.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@compadr/format": "workspace:*",
+    "typescript": "~5.9.0",
+    "vite": "^8.0.0",
+    "vitest": "^5.0.5"
+  }
+}

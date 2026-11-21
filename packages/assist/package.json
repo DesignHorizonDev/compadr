@@ -1,0 +1,24 @@
+{
+  "name": "@compadr/assist",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Compadr assist client: sends the requests of the assist contract to a service and checks its suggestions.",
+  "license": "FSL-1.1-ALv2",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.0",
+    "vite": "^8.0.0",
+    "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "@compadr/engine": "workspace:*",
+    "@compadr/format": "workspace:*"
+  }
+}

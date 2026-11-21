@@ -1,0 +1,34 @@
+name: Bug
+description: Compadr does something wrong or fails.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Remove any private content of your repository before you post. A security problem goes to SECURITY.md, not to an issue.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `npx compadr --version`.
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: The command that you ran, and the operating system.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: What Compadr printed or did.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true

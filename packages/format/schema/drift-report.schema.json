@@ -1,0 +1,2005 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "number",
+      "const": 2
+    },
+    "generator": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "const": "compadr"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "repository": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string",
+          "description": "Git reference analysed"
+        },
+        "commit": {
+          "type": "string",
+          "description": "Commit of the reference"
+        },
+        "adrDir": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "ref",
+        "commit",
+        "adrDir"
+      ],
+      "additionalProperties": false
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+      "description": "UTC date and time"
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9999
+          },
+          "file": {
+            "type": "string",
+            "description": "Path of the record in the repository"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "proposed",
+              "accepted",
+              "rejected",
+              "deprecated",
+              "superseded",
+              "unknown"
+            ]
+          },
+          "rawStatus": {
+            "type": "string",
+            "description": "Status as written in the record"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Date declared in the record"
+          },
+          "revisedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                "description": "UTC date and time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Date of the last commit that changed the record"
+          },
+          "lineCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "feature": {
+            "description": "compadr.feature",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "compadr.parent"
+          },
+          "amends": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9999
+            }
+          },
+          "amendedBy": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9999
+            }
+          },
+          "supersededBy": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9999
+            }
+          },
+          "codeArea": {
+            "description": "Folder of the code most linked to the decision",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text": {
+            "type": "object",
+            "properties": {
+              "relations": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Header items that link the decision to older ones, as Markdown"
+              },
+              "sections": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "heading": {
+                      "description": "Null for the text before the first subsection",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "line": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991,
+                      "description": "Line of the record where it starts"
+                    },
+                    "markdown": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "heading",
+                    "line",
+                    "markdown"
+                  ],
+                  "additionalProperties": false
+                },
+                "description": "Subsections of the Decision section, in order"
+              }
+            },
+            "required": [
+              "relations",
+              "sections"
+            ],
+            "additionalProperties": false
+          },
+          "history": {
+            "description": "Last commits that changed the record, the most recent first",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "commit": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{40}$"
+                },
+                "date": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                  "description": "UTC date and time"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "author": {
+                  "description": "Name of the commit author",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "commit",
+                "date",
+                "subject"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "attribution": {
+            "description": "Who made the decision: the deciders that the record names, or else the author of the commit that added it",
+            "type": "object",
+            "properties": {
+              "names": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "declared",
+                  "pull-request",
+                  "commit"
+                ]
+              },
+              "commit": {
+                "description": "Commit that wrote the line, for the sources read in git",
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              "pullRequest": {
+                "description": "Pull request of the commit, for the source pull-request",
+                "type": "object",
+                "properties": {
+                  "number": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "approved",
+                      "merged"
+                    ]
+                  }
+                },
+                "required": [
+                  "number",
+                  "title",
+                  "url",
+                  "role"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "names",
+              "source"
+            ],
+            "additionalProperties": false
+          },
+          "rule": {
+            "description": "What the decision requires, in one sentence. Null when the record declares no rule and its first sentence cannot stand alone",
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "declared",
+                      "first-sentence"
+                    ],
+                    "description": "declared: compadr.rule; first-sentence: the first sentence of the Decision section"
+                  }
+                },
+                "required": [
+                  "text",
+                  "source"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "number",
+          "file",
+          "title",
+          "status",
+          "rawStatus",
+          "date",
+          "revisedAt",
+          "lineCount",
+          "feature",
+          "parent",
+          "amends",
+          "amendedBy",
+          "supersededBy",
+          "codeArea"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "references": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "path"
+              },
+              "id": {
+                "type": "string",
+                "description": "Stable identifier: decision number, cited text and rank of the citation of that text in the record (0012:src/mail.ts:40:1). An edit of the record elsewhere leaves it unchanged"
+              },
+              "decision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999
+              },
+              "adrLine": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Line of the record that carries the reference"
+              },
+              "column": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Column of the opening backtick in that line"
+              },
+              "text": {
+                "type": "string",
+                "description": "Text cited between backticks"
+              },
+              "citedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                    "description": "UTC date and time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Date the line of the record was written (git blame)"
+              },
+              "checkedAt": {
+                "description": "Date of the commit at which a person checked the reference against the code (compadr.checked)",
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                    "description": "UTC date and time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "checkedBy": {
+                "description": "Who checked the reference: the name of the entry, or else the author of the commit that wrote it",
+                "type": "object",
+                "properties": {
+                  "names": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "declared",
+                      "pull-request",
+                      "commit"
+                    ]
+                  },
+                  "commit": {
+                    "description": "Commit that wrote the line, for the sources read in git",
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{40}$"
+                  },
+                  "pullRequest": {
+                    "description": "Pull request of the commit, for the source pull-request",
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      },
+                      "role": {
+                        "type": "string",
+                        "enum": [
+                          "approved",
+                          "merged"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "number",
+                      "title",
+                      "url",
+                      "role"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "names",
+                  "source"
+                ],
+                "additionalProperties": false
+              },
+              "path": {
+                "type": "string"
+              },
+              "lines": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "start": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "end": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "start",
+                      "end"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Lines cited after the path (file.ts:120-140)"
+              },
+              "resolvedPaths": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Tracked files or folders that match the path"
+              },
+              "anchor": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "symbol": {
+                        "type": "string",
+                        "description": "Qualified name of the symbol"
+                      },
+                      "fingerprint": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^sha256:[0-9a-f]{16}$",
+                            "description": "sha256: and 16 hex digits of the normalized text"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Fingerprint recorded in compadr.anchors, if any"
+                      },
+                      "lines": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "count": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "fingerprint": {
+                                "type": "string",
+                                "pattern": "^sha256:[0-9a-f]{16}$",
+                                "description": "sha256: and 16 hex digits of the normalized text"
+                              }
+                            },
+                            "required": [
+                              "count",
+                              "fingerprint"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Cited lines tracked inside the symbol, if any"
+                      }
+                    },
+                    "required": [
+                      "symbol",
+                      "fingerprint",
+                      "lines"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Set when the reference names a symbol: path#Symbol"
+              },
+              "proposal": {
+                "description": "Anchor proposed for a reference that cites lines",
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "symbol": {
+                        "type": "string"
+                      },
+                      "text": {
+                        "type": "string",
+                        "description": "New text of the reference: path#Symbol"
+                      },
+                      "fingerprint": {
+                        "type": "string",
+                        "pattern": "^sha256:[0-9a-f]{16}$",
+                        "description": "sha256: and 16 hex digits of the normalized text"
+                      },
+                      "symbolLines": {
+                        "type": "object",
+                        "properties": {
+                          "start": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "end": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "start",
+                          "end"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Lines of the symbol at the analysed commit"
+                      },
+                      "lines": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "count": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "fingerprint": {
+                                "type": "string",
+                                "pattern": "^sha256:[0-9a-f]{16}$",
+                                "description": "sha256: and 16 hex digits of the normalized text"
+                              },
+                              "start": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "count",
+                              "fingerprint",
+                              "start"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The cited lines, found unchanged inside the symbol at the analysed commit"
+                      }
+                    },
+                    "required": [
+                      "symbol",
+                      "text",
+                      "fingerprint",
+                      "symbolLines",
+                      "lines"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "id",
+              "decision",
+              "adrLine",
+              "column",
+              "text",
+              "citedAt",
+              "path",
+              "lines",
+              "resolvedPaths",
+              "anchor"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "symbol"
+              },
+              "id": {
+                "type": "string",
+                "description": "Stable identifier: decision number, cited text and rank of the citation of that text in the record (0012:src/mail.ts:40:1). An edit of the record elsewhere leaves it unchanged"
+              },
+              "decision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999
+              },
+              "adrLine": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Line of the record that carries the reference"
+              },
+              "column": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "Column of the opening backtick in that line"
+              },
+              "text": {
+                "type": "string",
+                "description": "Text cited between backticks"
+              },
+              "citedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                    "description": "UTC date and time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Date the line of the record was written (git blame)"
+              },
+              "checkedAt": {
+                "description": "Date of the commit at which a person checked the reference against the code (compadr.checked)",
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                    "description": "UTC date and time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "checkedBy": {
+                "description": "Who checked the reference: the name of the entry, or else the author of the commit that wrote it",
+                "type": "object",
+                "properties": {
+                  "names": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "declared",
+                      "pull-request",
+                      "commit"
+                    ]
+                  },
+                  "commit": {
+                    "description": "Commit that wrote the line, for the sources read in git",
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{40}$"
+                  },
+                  "pullRequest": {
+                    "description": "Pull request of the commit, for the source pull-request",
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      },
+                      "role": {
+                        "type": "string",
+                        "enum": [
+                          "approved",
+                          "merged"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "number",
+                      "title",
+                      "url",
+                      "role"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "names",
+                  "source"
+                ],
+                "additionalProperties": false
+              },
+              "symbol": {
+                "type": "string"
+              },
+              "foundInCode": {
+                "type": "boolean"
+              },
+              "declaredIn": {
+                "description": "Code files that declare the symbol at the start of a line (function, class, type, constant…), generated code aside. One declaration links the decision to its file; several are ambiguous and link none",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "file": {
+                      "type": "string"
+                    },
+                    "line": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "file",
+                    "line"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "id",
+              "decision",
+              "adrLine",
+              "column",
+              "text",
+              "citedAt",
+              "symbol",
+              "foundInCode"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "citations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "decision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9999,
+            "description": "Number of the decision cited"
+          },
+          "inCode": {
+            "type": "boolean",
+            "description": "False for Markdown and text files outside the ADR folder"
+          }
+        },
+        "required": [
+          "file",
+          "line",
+          "decision",
+          "inCode"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "signals": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "path-missing"
+              },
+              "level": {
+                "type": "string",
+                "const": "broken"
+              },
+              "id": {
+                "type": "string",
+                "description": "Stable identifier of the signal"
+              },
+              "decision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999,
+                "description": "Decision concerned by the signal"
+              },
+              "reference": {
+                "type": "string",
+                "description": "Identifier of the code reference"
+              }
+            },
+            "required": [
+              "type",
+              "level",
+              "id",
+              "decision",
+              "reference"
+            ],
+            "additionalProperties": false,
+            "description": "A cited path no longer exists"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "cited-line-out-of-range"
+              },
+              "level": {
+                "type": "string",
+                "const": "broken"
+              },
+              "id": {
+                "type": "string",
+                "description": "Stable identifier of the signal"
+              },
+              "decision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999,
+                "description": "Decision concerned by the signal"
+              },
+              "reference": {
+                "type": "string",
+                "description": "Identifier of the code reference"
+              },
+              "fileLineCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "type",
+              "level",
+              "id",
+              "decision",
+              "reference",
+              "fileLineCount"
+            ],
+            "additionalProperties": false,
+            "description": "A cited line is beyond the end of the file"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "cited-line-changed"
+              },
+              "level": {
+                "type": "string",
+                "const": "review"
+              },
+              "id": {
+                "type": "string",
+                "description": "Stable identifier of the signal"
+              },
+              "decision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999,
+                "description": "Decision concerned by the signal"
+              },
+              "reference": {
+                "type": "string",
+                "description": "Identifier of the code reference"
+              },
+              "citedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                "description": "UTC date and time"
+              },
+              "lineChangedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                "description": "UTC date and time"
+              }
+            },
+            "required": [
+              "type",
+              "level",
+              "id",
+              "decision",
+              "reference",
+              "citedAt",
+              "lineChangedAt"
+            ],
+            "additionalProperties": false,
+            "description": "A cited line was changed after its citation"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "cited-file-changed"
+              },
+              "level": {
+                "type": "string",
+                "const": "order"
+              },
+              "id": {
+                "type": "string",
+                "description": "Stable identifier of the signal"
+              },
+              "decision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999,
+                "description": "Decision concerned by the signal"
+              },
+              "reference": {
+                "type": "string",
+                "description": "Identifier of the code reference"
+              },
+              "citedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                "description": "UTC date and time"
+              },
+              "commitsSince": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "type",
+              "level",
+              "id",
+              "decision",
+              "reference",
+              "citedAt",
+              "commitsSince"
+            ],
+            "additionalProperties": false,
+            "description": "A cited line sits in a file changed since its citation, so it may have moved"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "linked-files-changed"
+              },
+              "level": {
+                "type": "string",
+                "const": "order"
+              },
+              "id": {
+                "type": "string",
+                "description": "Stable identifier of the signal"
+              },
+              "decision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999,
+                "description": "Decision concerned by the signal"
+              },
+              "oldestCitedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                "description": "UTC date and time"
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "commitsSince": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "commitsSince"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "type",
+              "level",
+              "id",
+              "decision",
+              "oldestCitedAt",
+              "files"
+            ],
+            "additionalProperties": false,
+            "description": "Files linked to an accepted decision changed since their citation"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "superseded-decision-cited"
+              },
+              "level": {
+                "type": "string",
+                "const": "broken"
+              },
+              "id": {
+                "type": "string",
+                "description": "Stable identifier of the signal"
+              },
+              "decision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999,
+                "description": "Decision concerned by the signal"
+              },
+              "file": {
+                "type": "string"
+              },
+              "line": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "supersededBy": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9999
+                }
+              }
+            },
+            "required": [
+              "type",
+              "level",
+              "id",
+              "decision",
+              "file",
+              "line",
+              "supersededBy"
+            ],
+            "additionalProperties": false,
+            "description": "The code cites a decision that is no longer in force"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "unknown-decision-cited"
+              },
+              "level": {
+                "type": "string",
+                "const": "broken"
+              },
+              "id": {
+                "type": "string",
+                "description": "Stable identifier of the signal"
+              },
+              "decision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999,
+                "description": "Decision concerned by the signal"
+              },
+              "file": {
+                "type": "string"
+              },
+              "line": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "type",
+              "level",
+              "id",
+              "decision",
+              "file",
+              "line"
+            ],
+            "additionalProperties": false,
+            "description": "The repository cites a decision that does not exist at this reference"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "index-status-mismatch"
+              },
+              "level": {
+                "type": "string",
+                "const": "broken"
+              },
+              "id": {
+                "type": "string",
+                "description": "Stable identifier of the signal"
+              },
+              "decision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999,
+                "description": "Decision concerned by the signal"
+              },
+              "indexStatus": {
+                "type": "string"
+              },
+              "recordStatus": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "level",
+              "id",
+              "decision",
+              "indexStatus",
+              "recordStatus"
+            ],
+            "additionalProperties": false,
+            "description": "The index and the record give different statuses"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "anchor-symbol-missing"
+              },
+              "level": {
+                "type": "string",
+                "const": "broken"
+              },
+              "id": {
+                "type": "string",
+                "description": "Stable identifier of the signal"
+              },
+              "decision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999,
+                "description": "Decision concerned by the signal"
+              },
+              "reference": {
+                "type": "string",
+                "description": "Identifier of the code reference"
+              }
+            },
+            "required": [
+              "type",
+              "level",
+              "id",
+              "decision",
+              "reference"
+            ],
+            "additionalProperties": false,
+            "description": "The symbol of an anchored reference no longer exists"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "anchor-symbol-ambiguous"
+              },
+              "level": {
+                "type": "string",
+                "const": "review"
+              },
+              "id": {
+                "type": "string",
+                "description": "Stable identifier of the signal"
+              },
+              "decision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999,
+                "description": "Decision concerned by the signal"
+              },
+              "reference": {
+                "type": "string",
+                "description": "Identifier of the code reference"
+              },
+              "matches": {
+                "type": "integer",
+                "minimum": 2,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "type",
+              "level",
+              "id",
+              "decision",
+              "reference",
+              "matches"
+            ],
+            "additionalProperties": false,
+            "description": "Several symbols bear the name of an anchored reference"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "anchor-content-changed"
+              },
+              "level": {
+                "type": "string",
+                "const": "review"
+              },
+              "id": {
+                "type": "string",
+                "description": "Stable identifier of the signal"
+              },
+              "decision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999,
+                "description": "Decision concerned by the signal"
+              },
+              "reference": {
+                "type": "string",
+                "description": "Identifier of the code reference"
+              },
+              "currentFingerprint": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{16}$",
+                "description": "sha256: and 16 hex digits of the normalized text"
+              }
+            },
+            "required": [
+              "type",
+              "level",
+              "id",
+              "decision",
+              "reference",
+              "currentFingerprint"
+            ],
+            "additionalProperties": false,
+            "description": "The symbol of an anchored reference changed since its fingerprint"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "anchor-lines-changed"
+              },
+              "level": {
+                "type": "string",
+                "const": "review"
+              },
+              "id": {
+                "type": "string",
+                "description": "Stable identifier of the signal"
+              },
+              "decision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999,
+                "description": "Decision concerned by the signal"
+              },
+              "reference": {
+                "type": "string",
+                "description": "Identifier of the code reference"
+              }
+            },
+            "required": [
+              "type",
+              "level",
+              "id",
+              "decision",
+              "reference"
+            ],
+            "additionalProperties": false,
+            "description": "The tracked lines are no longer found in the symbol"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "anchor-unverified"
+              },
+              "level": {
+                "type": "string",
+                "const": "info"
+              },
+              "id": {
+                "type": "string",
+                "description": "Stable identifier of the signal"
+              },
+              "decision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999,
+                "description": "Decision concerned by the signal"
+              },
+              "reference": {
+                "type": "string",
+                "description": "Identifier of the code reference"
+              },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "no-fingerprint",
+                  "unsupported-language"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "level",
+              "id",
+              "decision",
+              "reference",
+              "reason"
+            ],
+            "additionalProperties": false,
+            "description": "An anchored reference that the engine cannot check"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "amendment-chain"
+              },
+              "level": {
+                "type": "string",
+                "const": "info"
+              },
+              "id": {
+                "type": "string",
+                "description": "Stable identifier of the signal"
+              },
+              "decision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999,
+                "description": "Decision concerned by the signal"
+              },
+              "amendedBy": {
+                "minItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9999
+                }
+              }
+            },
+            "required": [
+              "type",
+              "level",
+              "id",
+              "decision",
+              "amendedBy"
+            ],
+            "additionalProperties": false,
+            "description": "A decision changed by three decisions or more, a candidate for consolidation"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "decision-without-code"
+              },
+              "level": {
+                "type": "string",
+                "const": "info"
+              },
+              "id": {
+                "type": "string",
+                "description": "Stable identifier of the signal"
+              },
+              "decision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999,
+                "description": "Decision concerned by the signal"
+              }
+            },
+            "required": [
+              "type",
+              "level",
+              "id",
+              "decision"
+            ],
+            "additionalProperties": false,
+            "description": "An accepted decision with no link to the code"
+          }
+        ]
+      }
+    },
+    "families": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "principal": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9999,
+            "description": "Main decision of the family"
+          },
+          "details": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9999
+            }
+          },
+          "principalIsDetail": {
+            "type": "boolean",
+            "description": "True when the main decision is itself a detail of another"
+          }
+        },
+        "required": [
+          "principal",
+          "details",
+          "principalIsDetail"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "label": {
+            "type": "string"
+          },
+          "main": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Main decision of the feature"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "declared",
+              "proposed"
+            ],
+            "description": "declared: read in compadr.feature and the glossary; proposed: computed from the relations and the cited code files"
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9999
+            },
+            "description": "Every decision of the feature, the main one included"
+          },
+          "rules": {
+            "description": "Rules in force that a person validated, from features.yml",
+            "type": "object",
+            "properties": {
+              "decision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999,
+                "description": "Main decision whose chain was read"
+              },
+              "validated": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                "description": "Day of the validation"
+              },
+              "model": {
+                "type": "string"
+              },
+              "promptVersion": {
+                "type": "string"
+              },
+              "chain": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "decision": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9999
+                    },
+                    "hash": {
+                      "type": "string",
+                      "pattern": "^sha256:[0-9a-f]{16}$"
+                    }
+                  },
+                  "required": [
+                    "decision",
+                    "hash"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "rules": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "rule": {
+                      "type": "string"
+                    },
+                    "sources": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9999
+                      }
+                    },
+                    "quote": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Passage of the record, copied word for word"
+                    }
+                  },
+                  "required": [
+                    "rule",
+                    "sources",
+                    "quote"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "replaced": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "rule": {
+                      "type": "string"
+                    },
+                    "record": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9999
+                    },
+                    "replacedBy": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9999
+                    }
+                  },
+                  "required": [
+                    "rule",
+                    "record",
+                    "replacedBy"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "conflicts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "point": {
+                      "type": "string"
+                    },
+                    "records": {
+                      "minItems": 2,
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9999
+                      }
+                    }
+                  },
+                  "required": [
+                    "point",
+                    "records"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "decision",
+              "validated",
+              "model",
+              "promptVersion",
+              "chain",
+              "rules",
+              "replaced",
+              "conflicts"
+            ],
+            "additionalProperties": false
+          },
+          "staleRecords": {
+            "description": "Records of the chain that changed, joined or left it since the validation of the rules; empty when they are current",
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9999
+            }
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "main",
+          "source",
+          "decisions"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "featureProblems": {
+      "description": "Declarations of features that the engine left out, and why",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "replacedRules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9999,
+            "description": "Decision that replaces the rule"
+          },
+          "quote": {
+            "type": "string"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Decision where the quote was found once, if any"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "section": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Index in the sections of the target"
+                  },
+                  "start": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "end": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "section",
+                  "start",
+                  "end"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Offsets of the rule in a section of the decision; null when it is elsewhere in the record"
+          }
+        },
+        "required": [
+          "decision",
+          "quote",
+          "target",
+          "location"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "rulePolicy": {
+      "description": "rules.policy of compadr.yml, or its default",
+      "type": "string",
+      "enum": [
+        "derived",
+        "preferred",
+        "required"
+      ]
+    },
+    "configProblems": {
+      "description": "Settings of compadr.yml left at their default, and why",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "assist": {
+      "description": "assist settings of compadr.yml, or their defaults",
+      "type": "object",
+      "properties": {
+        "semantic": {
+          "type": "boolean",
+          "description": "Whether compadr check --semantic may send the changes to the assist service"
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Paths whose changes never leave the repository: a file, or a folder and everything under it"
+        }
+      },
+      "required": [
+        "semantic",
+        "exclude"
+      ],
+      "additionalProperties": false
+    },
+    "zones": {
+      "description": "Folders of code and how much the decisions in force reach them",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Folder of the zone; \".\" for the root"
+          },
+          "own": {
+            "type": "boolean",
+            "description": "True when the subfolders of the folder are zones of their own: the zone then holds the files directly in the folder"
+          },
+          "files": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Code files of the zone"
+          },
+          "linkedFiles": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Files that a decision in force names: cited by its record, or citing it"
+          },
+          "crossChecked": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Files that cite a decision whose record cites them too"
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Sum of the weights of the links of the zone"
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "number": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9999
+                },
+                "weight": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "number",
+                "weight"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Decisions in force linked to files of the zone, the heaviest first"
+          },
+          "folderCited": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9999
+            },
+            "description": "Decisions whose record cites the folder of the zone or one inside it, which says little about each file"
+          },
+          "coverage": {
+            "type": "string",
+            "enum": [
+              "strong",
+              "partial",
+              "thin",
+              "folder-only",
+              "none"
+            ]
+          }
+        },
+        "required": [
+          "path",
+          "own",
+          "files",
+          "linkedFiles",
+          "crossChecked",
+          "weight",
+          "decisions",
+          "folderCited",
+          "coverage"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "generator",
+    "repository",
+    "generatedAt",
+    "decisions",
+    "references",
+    "citations",
+    "signals",
+    "families"
+  ],
+  "additionalProperties": false,
+  "title": "Compadr drift report",
+  "description": "Decisions, code references, signals, families and features of one repository at one git reference."
+}

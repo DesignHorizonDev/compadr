@@ -1,0 +1,13 @@
+**/dist
+**/node_modules
+.yarn
+yarn.lock
+# License texts are reproduced verbatim.
+**/LICENSE
+**/LICENSE.md
+**/NOTICE
+*.md
+# Generated from packages/format/src/report-schema.ts.
+**/schema/*.schema.json
+# Generated from packages/tokens/src/tokens.ts.
+packages/tokens/css/tokens.css

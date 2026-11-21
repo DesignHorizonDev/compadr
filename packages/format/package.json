@@ -1,0 +1,50 @@
+{
+  "name": "@compadr/format",
+  "private": true,
+  "version": "0.4.0",
+  "description": "The Compadr decision record format: compadr fields, supported ADR dialects and JSON schemas.",
+  "keywords": [
+    "adr",
+    "architecture-decision-records",
+    "madr",
+    "log4brains",
+    "adr-tools",
+    "json-schema"
+  ],
+  "homepage": "https://compadr.io",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DesignHorizonDev/compadr.git",
+    "directory": "packages/format"
+  },
+  "bugs": {
+    "url": "https://github.com/DesignHorizonDev/compadr/issues",
+    "email": "contact@compadr.io"
+  },
+  "author": "Design Horizon & Development (https://compadr.io)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./drift-report.schema.json": "./schema/drift-report.schema.json",
+    "./assist-request.schema.json": "./schema/assist-request.schema.json",
+    "./assist-suggestion.schema.json": "./schema/assist-suggestion.schema.json",
+    "./semantic-findings.schema.json": "./schema/semantic-findings.schema.json"
+  },
+  "scripts": {
+    "schema": "node scripts/write-json-schema.ts",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "tsup": "^9.0.0",
+    "typescript": "~5.9.0",
+    "vite": "^8.0.0",
+    "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1",
+    "zod": "^4.6.7"
+  }
+}

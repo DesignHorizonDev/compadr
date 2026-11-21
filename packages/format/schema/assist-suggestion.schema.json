@@ -1,0 +1,553 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "check"
+        },
+        "schemaVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "status": {
+          "type": "string",
+          "const": "suggested"
+        },
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string"
+            },
+            "promptVersion": {
+              "type": "string"
+            },
+            "inputHash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "description": "SHA-256 of the request, as Compadr serialized it"
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            }
+          },
+          "required": [
+            "model",
+            "promptVersion",
+            "inputHash",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "decision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999
+              },
+              "verdict": {
+                "type": "string",
+                "enum": [
+                  "violated",
+                  "at-risk"
+                ]
+              },
+              "quote": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Passage of the decision text that states the rule, copied word for word"
+              },
+              "evidence": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "Line or lines of the diff"
+                  }
+                },
+                "required": [
+                  "path",
+                  "text"
+                ],
+                "additionalProperties": false
+              },
+              "explanation": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "decision",
+              "verdict",
+              "quote",
+              "evidence",
+              "explanation"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "schemaVersion",
+        "status",
+        "provenance",
+        "findings"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "consolidate"
+        },
+        "schemaVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "status": {
+          "type": "string",
+          "const": "suggested"
+        },
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string"
+            },
+            "promptVersion": {
+              "type": "string"
+            },
+            "inputHash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "description": "SHA-256 of the request, as Compadr serialized it"
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            }
+          },
+          "required": [
+            "model",
+            "promptVersion",
+            "inputHash",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "rule": {
+                "type": "string"
+              },
+              "sources": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9999
+                }
+              },
+              "quote": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Passage of the record, copied word for word"
+              }
+            },
+            "required": [
+              "rule",
+              "sources",
+              "quote"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "replaced": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "rule": {
+                "type": "string"
+              },
+              "record": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999
+              },
+              "replacedBy": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9999
+              }
+            },
+            "required": [
+              "rule",
+              "record",
+              "replacedBy"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "conflicts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "point": {
+                "type": "string"
+              },
+              "records": {
+                "minItems": 2,
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9999
+                }
+              }
+            },
+            "required": [
+              "point",
+              "records"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "schemaVersion",
+        "status",
+        "provenance",
+        "rules",
+        "replaced",
+        "conflicts"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "plain"
+        },
+        "schemaVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "status": {
+          "type": "string",
+          "const": "suggested"
+        },
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string"
+            },
+            "promptVersion": {
+              "type": "string"
+            },
+            "inputHash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "description": "SHA-256 of the request, as Compadr serialized it"
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            }
+          },
+          "required": [
+            "model",
+            "promptVersion",
+            "inputHash",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "kind",
+        "schemaVersion",
+        "status",
+        "provenance",
+        "summary"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "draft"
+        },
+        "schemaVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "status": {
+          "type": "string",
+          "const": "suggested"
+        },
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string"
+            },
+            "promptVersion": {
+              "type": "string"
+            },
+            "inputHash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "description": "SHA-256 of the request, as Compadr serialized it"
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            }
+          },
+          "required": [
+            "model",
+            "promptVersion",
+            "inputHash",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        },
+        "notNeeded": {
+          "description": "Why the change needs no new record, when it only applies one",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "rule": {
+          "type": "string"
+        },
+        "amends": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9999
+          }
+        },
+        "supersedes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9999
+          }
+        },
+        "context": {
+          "type": "string"
+        },
+        "decision": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "heading": {
+                "type": "string",
+                "description": "States the rule of the subsection"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "heading",
+              "text"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "consequences": {
+          "type": "string"
+        },
+        "codeRefs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "schemaVersion",
+        "status",
+        "provenance",
+        "notNeeded",
+        "title",
+        "rule",
+        "amends",
+        "supersedes",
+        "context",
+        "decision",
+        "consequences",
+        "codeRefs"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "accept"
+        },
+        "schemaVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "status": {
+          "type": "string",
+          "const": "suggested"
+        },
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string"
+            },
+            "promptVersion": {
+              "type": "string"
+            },
+            "inputHash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "description": "SHA-256 of the request, as Compadr serialized it"
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            }
+          },
+          "required": [
+            "model",
+            "promptVersion",
+            "inputHash",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        },
+        "recommendation": {
+          "type": "string",
+          "enum": [
+            "accept",
+            "amend-then-accept",
+            "keep-proposed",
+            "withdraw"
+          ]
+        },
+        "explanation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "points": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "quote": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Passage of the record, copied word for word"
+              },
+              "evidence": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "text": {
+                        "type": "string",
+                        "description": "Line or lines of an excerpt that was sent"
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "text"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "What the code shows; null when no excerpt shows it"
+              },
+              "finding": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "quote",
+              "evidence",
+              "finding"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "amendments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "What to change in the record before a person accepts it"
+        }
+      },
+      "required": [
+        "kind",
+        "schemaVersion",
+        "status",
+        "provenance",
+        "recommendation",
+        "explanation",
+        "points",
+        "amendments"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

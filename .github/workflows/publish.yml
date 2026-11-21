@@ -1,0 +1,170 @@
+name: Publish
+
+# Publishes @compadr/format, @compadr/cli and @compadr/console on npm, from
+# the archives that tools/pack.mjs builds and checks at a tag.
+#
+# - Run by hand (workflow_dispatch) with a tag. Without `publish`, the run is
+#   a dry run: it builds the archives and runs `npm publish --dry-run`.
+# - With `publish`, the job waits for the approval of the environment `npm`,
+#   then publishes. npm authenticates the run by trusted publishing (OIDC):
+#   no token is stored. The very first publication of a package cannot use
+#   it, since npm configures trusted publishing on an existing package: that
+#   run reads a short-lived token from the secret NPM_TOKEN, which is then
+#   revoked and deleted.
+# - npm adds the provenance of each package when the repository is public.
+# - A pull request that changes this file or tools/pack.mjs runs the dry run.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to publish, such as v0.4.0
+        required: true
+        type: string
+      publish:
+        description: Publish on npm. Off, the run is a dry run.
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - .github/workflows/publish.yml
+      - tools/pack.mjs
+
+permissions: {}
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+env:
+  # Trusted publishing needs npm 11.5.1 or later.
+  NPM_VERSION: 11.21.3
+  # Published in this order: the command line and the console do not
+  # depend on the format at install, but the format comes first so that its
+  # schemas are available when the others are announced.
+  PACKAGES: format cli console
+
+jobs:
+  archives:
+    name: Archives
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Enable Yarn 4
+        run: corepack enable
+
+      - name: Install
+        run: yarn install --immutable
+
+      # A published version always matches its tag.
+      - name: The versions match the tag
+        if: inputs.tag != ''
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          for name in $PACKAGES; do
+            version=$(node -p "require('./packages/$name/package.json').version")
+            if [ "v$version" != "$TAG" ]; then
+              echo "::error::@compadr/$name is $version, the tag is $TAG"
+              exit 1
+            fi
+          done
+          echo "✔ $PACKAGES at $TAG"
+
+      - name: Build
+        run: yarn build
+
+      - name: Archives
+        run: node tools/pack.mjs "$RUNNER_TEMP/packs"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: packs
+          path: ${{ runner.temp }}/packs/*.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  dry-run:
+    name: Dry run
+    if: ${{ !inputs.publish }}
+    needs: archives
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: packs
+          path: packs
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: npm
+        run: npm install --global "npm@$NPM_VERSION"
+
+      - name: Dry run of each package
+        run: |
+          for name in $PACKAGES; do
+            npm publish ./packs/compadr-$name-*.tgz --access public --dry-run
+          done
+
+  publish:
+    name: Publish
+    if: ${{ inputs.publish }}
+    needs: archives
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The environment holds the approval of a maintainer, and the trusted
+    # publisher of each package names it. Its deployment branches are limited
+    # to main and the tags v*: a run from another branch waits forever.
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: packs
+          path: packs
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: npm
+        run: npm install --global "npm@$NPM_VERSION"
+
+      - name: Publish each package
+        env:
+          # Empty after the first publication: npm then uses trusted
+          # publishing.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # A token does not add the provenance by itself; trusted publishing
+          # does. Neither works from a private repository.
+          NPM_CONFIG_PROVENANCE: ${{ !github.event.repository.private }}
+        # A path without ./ reads as a GitHub repository (user/repository).
+        # A version already on npm is left as it is: a run stopped after the
+        # first package can run again.
+        run: |
+          for name in $PACKAGES; do
+            archive=$(ls ./packs/compadr-$name-*.tgz)
+            version=$(tar -xzOf "$archive" package/package.json | node -p "JSON.parse(require('fs').readFileSync(0)).version")
+            if npm view "@compadr/$name@$version" version >/dev/null 2>&1; then
+              echo "@compadr/$name@$version is already on npm"
+              continue
+            fi
+            npm publish "$archive" --access public
+          done

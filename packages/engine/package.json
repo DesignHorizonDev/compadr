@@ -1,0 +1,26 @@
+{
+  "name": "@compadr/engine",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Compadr drift engine: deterministic, read-only checks of decision records against the code.",
+  "license": "FSL-1.1-ALv2",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing/fixture-repo.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.0",
+    "vite": "^8.0.0",
+    "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "@compadr/format": "workspace:*",
+    "@vscode/tree-sitter-wasm": "^0.3.1",
+    "web-tree-sitter": "^0.27.1"
+  }
+}
