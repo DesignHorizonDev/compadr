@@ -44,6 +44,13 @@ beforeAll(() => {
           'A failed charge is retried three times, then a person decides.'
         ),
         'server/billing/retry.ts': '// ADR-0003\nexport const retries = 3\n',
+        'docs/adr/0004-limits.md': record(
+          4,
+          'Limits',
+          'Status: Proposed',
+          'Limits live in `server/billing/limits.ts`, and nowhere else in `server/billing/`.'
+        ),
+        'server/billing/limits.ts': 'export const limit = 5\n',
       },
     },
   ])
@@ -124,6 +131,30 @@ describe('compadr assist', () => {
       expect(sent).toHaveLength(1)
       expect(err).toContain('0 item(s) rejected by the guard')
     }
+  })
+
+  it('sends the start of a file that a proposed record cites, not of a folder', async () => {
+    const { code, out, err } = await run([
+      'assist',
+      'accept',
+      fixture.path,
+      '--decision',
+      '4',
+      '--request',
+    ])
+    expect(code, err).toBe(0)
+    const request = AssistRequestSchema.parse(JSON.parse(out))
+    expect(request).toMatchObject({
+      kind: 'accept',
+      code: [
+        {
+          path: 'server/billing/limits.ts',
+          startLine: 1,
+          text: 'export const limit = 5\n',
+        },
+      ],
+      omittedFiles: [],
+    })
   })
 
   it('sends the decisions of the change and the chain of amendments', async () => {

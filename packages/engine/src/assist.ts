@@ -24,7 +24,7 @@ import {
 import { checkChange, parseUnifiedDiff } from './change.ts'
 import { renderMemoryCard } from './generated.ts'
 import { closeDecisions, proposalOfDraft } from './propose.ts'
-import { isCode } from './read-corpus.ts'
+import { citedDecisions, declarationLine, isCode } from './read-corpus.ts'
 import { maskSecrets, maskSecretsInDiff, secretFile } from './secrets.ts'
 
 /** Decisions of a check request, at most. */
@@ -128,9 +128,34 @@ export function decisionText(
 }
 
 /**
+ * Decisions that the diff a model reads cites in the lines it keeps or adds
+ * ("// keeps the cap (ADR 0004)"), in order of appearance, with the files
+ * that cite each one. A removed line no longer binds the code.
+ */
+function citedInDiff(diff: string): Map<number, string[]> {
+  const cited = new Map<number, string[]>()
+  for (const part of diff.split(FILE_START)) {
+    const header = HEADER_PATH.exec(part)
+    const hunk = FIRST_HUNK.exec(part)
+    if (header === null || hunk === null) continue
+    const path = normalizeRepositoryPath(header[1]!)
+    for (const line of part.slice(hunk.index).split('\n')) {
+      if (!line.startsWith('+') && !line.startsWith(' ')) continue
+      for (const number of citedDecisions(line.slice(1))) {
+        const files = cited.get(number) ?? []
+        if (!files.includes(path)) files.push(path)
+        cited.set(number, files)
+      }
+    }
+  }
+  return cited
+}
+
+/**
  * What a model needs to say whether a change breaks a decision. The decisions
  * are those in force that the changed files fall under: first those that a
- * signal of the change names, then the heaviest links to the changed files.
+ * signal of the change names, then those in force that the diff cites, then
+ * the heaviest links to the changed files.
  */
 export function buildCheckRequest(
   report: DriftReport,
@@ -160,7 +185,29 @@ export function buildCheckRequest(
   const signalled = change.signals
     .map(signal => signal.decision)
     .filter(number => linked.has(number))
-  const chosen = [...new Set([...signalled, ...byWeight])].slice(
+  // A decision that the diff cites binds the change, even when the report
+  // links it to none of its files yet.
+  const sent = assistDiff(diff, budget.maxDiffChars)
+  const byNumber = new Map(report.decisions.map(d => [d.number, d]))
+  const cited: number[] = []
+  for (const [number, citing] of citedInDiff(sent.diff)) {
+    const decision = byNumber.get(number)
+    if (decision === undefined || !isInForce(decision.status)) continue
+    cited.push(number)
+    if (!linked.has(number)) {
+      const rule = decision.rule?.text
+      linked.set(number, {
+        decision: number,
+        title: decision.title,
+        ...(rule === undefined ? {} : { rule }),
+        status: decision.status,
+        scope: 'file',
+        replaces: [],
+        files: citing,
+      })
+    }
+  }
+  const chosen = [...new Set([...signalled, ...cited, ...byWeight])].slice(
     0,
     maxDecisions
   )
@@ -191,7 +238,7 @@ export function buildCheckRequest(
       decision,
       path,
     })),
-    ...assistDiff(diff, budget.maxDiffChars),
+    ...sent,
   }
 }
 
@@ -340,13 +387,22 @@ export const ASSIST_MAX_EXCERPT_CHARS = 60_000
 const EXCERPT_BEFORE = 10
 const EXCERPT_AFTER = 30
 
-/** The windows of lines around the cited lines of a file, merged when they touch. */
-function excerptsOf(path: string, text: string, lines: number[]) {
+/** Lines of a file to show: a span, kept with the lines around it. */
+interface Span {
+  from: number
+  to: number
+}
+
+/**
+ * The windows of lines around the spans of a file, merged when they touch.
+ * Each span keeps 10 lines before it and 30 after, as a citation does.
+ */
+function excerptsOf(path: string, text: string, spans: Span[]) {
   const all = text.split('\n')
   const windows: [number, number][] = []
-  for (const line of [...lines].sort((a, b) => a - b)) {
-    const from = Math.max(1, line - EXCERPT_BEFORE)
-    const to = Math.min(all.length, line + EXCERPT_AFTER)
+  for (const span of [...spans].sort((a, b) => a.from - b.from)) {
+    const from = Math.max(1, span.from - EXCERPT_BEFORE)
+    const to = Math.min(all.length, span.to + EXCERPT_AFTER)
     const last = windows.at(-1)
     if (last !== undefined && from <= last[1] + 1)
       last[1] = Math.max(last[1], to)
@@ -359,38 +415,115 @@ function excerptsOf(path: string, text: string, lines: number[]) {
   }))
 }
 
+/** What the record of a decision cites in one file. */
+type CitedCode = { lines: Span } | { symbol: string } | { head: true }
+
 /**
- * A proposed decision and the code that cites it, for a recommendation: the
- * lines around each citation, the files that cite it most first, within a
- * budget. Files that compadr.yml keeps from the service never leave, nor do
- * documentation, lock files and generated code.
+ * The code that the record of a decision cites, by file, in the order of the
+ * record: cited lines, the declaration of a symbol, or the start of a whole
+ * file. A folder, a path that matches several files and a symbol declared in
+ * several files give nothing.
+ */
+async function codeOfRecord(
+  report: DriftReport,
+  number: number,
+  isFile: (path: string) => Promise<boolean>
+): Promise<Map<string, CitedCode[]>> {
+  const cited = new Map<string, CitedCode[]>()
+  const add = (path: string, code: CitedCode) =>
+    cited.set(path, [...(cited.get(path) ?? []), code])
+  for (const reference of report.references) {
+    if (reference.decision !== number) continue
+    if (reference.kind === 'symbol') {
+      const [only, ...others] = reference.declaredIn ?? []
+      if (only !== undefined && others.length === 0) {
+        add(only.file, { lines: { from: only.line, to: only.line } })
+      }
+      continue
+    }
+    if (reference.resolvedPaths.length !== 1) continue
+    const path = reference.resolvedPaths[0]!
+    if (reference.lines !== null) {
+      add(path, {
+        lines: { from: reference.lines.start, to: reference.lines.end },
+      })
+    } else if (reference.anchor !== null) {
+      add(path, { symbol: reference.anchor.symbol })
+    } else if (await isFile(path)) {
+      add(path, { head: true })
+    }
+  }
+  return cited
+}
+
+/**
+ * The span of what a record cites in a file. An anchored symbol gives its
+ * declaration, or the class that holds a method. When no line of the file
+ * declares it, the record still cites the file: its start is sent, as for a
+ * file cited whole.
+ */
+function spanOf(code: CitedCode, text: string): Span {
+  if ('lines' in code) return code.lines
+  if ('symbol' in code) {
+    // `Pool.acquire`: the method, or else the class that holds it.
+    for (const name of code.symbol.split('.').reverse()) {
+      const line = declarationLine(text, name)
+      if (line !== null) return { from: line, to: line }
+    }
+  }
+  return { from: 1, to: 1 }
+}
+
+/**
+ * A proposed decision and the code around it, for a recommendation: the
+ * lines around each citation of the decision in the code, the files that cite
+ * it most first, then the code that its record cites, in the order of the
+ * record. Everything fits within a budget. Files that compadr.yml keeps from
+ * the service never leave, nor do documentation, lock files and generated
+ * code. `isFile` tells a file from a folder among the paths that the record
+ * cites; without it, a path cited whole gives no excerpt.
  */
 export async function buildAcceptRequest(
   report: DriftReport,
   number: number,
   read: ReadRecord,
-  budget: { maxFiles?: number; maxChars?: number } = {}
+  budget: { maxFiles?: number; maxChars?: number } = {},
+  isFile: (path: string) => Promise<boolean> = () => Promise.resolve(false)
 ): Promise<AcceptRequest> {
   const maxFiles = budget.maxFiles ?? ASSIST_MAX_ACCEPT_FILES
   const maxChars = budget.maxChars ?? ASSIST_MAX_EXCERPT_CHARS
   const settings = report.assist ?? { semantic: false, exclude: [] }
+  const sendable = (path: string) =>
+    !leftOutOfAssistDiff(path) && !excludedFromAssist(settings, path)
   const cited = new Map<string, number[]>()
   for (const citation of report.citations) {
     if (citation.decision !== number || !citation.inCode) continue
     const path = normalizeRepositoryPath(citation.file)
-    if (leftOutOfAssistDiff(path) || excludedFromAssist(settings, path)) {
-      continue
-    }
+    if (!sendable(path)) continue
     cited.set(path, [...(cited.get(path) ?? []), citation.line])
   }
-  const order = [...cited.keys()].sort(
-    (a, b) => cited.get(b)!.length - cited.get(a)!.length || a.localeCompare(b)
+  const fromRecord = new Map(
+    [...(await codeOfRecord(report, number, isFile))].filter(([path]) =>
+      sendable(path)
+    )
   )
+  const order = [
+    ...[...cited.keys()].sort(
+      (a, b) =>
+        cited.get(b)!.length - cited.get(a)!.length || a.localeCompare(b)
+    ),
+    ...[...fromRecord.keys()].filter(path => !cited.has(path)),
+  ]
   const code: AssistCodeExcerpt[] = []
   const omittedFiles: string[] = []
   let size = 0
   for (const path of order) {
-    const excerpts = excerptsOf(path, await read(path), cited.get(path)!)
+    const text = await read(path)
+    const spans = [
+      ...(cited.get(path) ?? []).map(line => ({ from: line, to: line })),
+      ...(fromRecord.get(path) ?? []).map(entry => spanOf(entry, text)),
+    ]
+    const excerpts = excerptsOf(path, text, spans)
     const length = excerpts.reduce((sum, e) => sum + e.text.length, 0)
     const files = new Set(code.map(e => e.path)).size
     if (files < maxFiles && size + length <= maxChars) {

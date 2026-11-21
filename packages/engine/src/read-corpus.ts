@@ -81,6 +81,19 @@ const DECLARED_NAME =
 const GENERIC_FOLDERS = new Set(['src', 'lib', 'app', 'packages'])
 const CONCURRENCY = 8
 
+/**
+ * Line (from 1) where `text` declares `name` at the start of a line, as the
+ * engine finds a declaration: `export function name`, `class Name`. Returns
+ * null when no line declares it.
+ */
+export function declarationLine(text: string, name: string): number | null {
+  const lines = text.split('\n')
+  for (let i = 0; i < lines.length; i++) {
+    if (DECLARED_NAME.exec(lines[i]!)?.[1] === name) return i + 1
+  }
+  return null
+}
+
 /** False for Markdown and text files, which are documentation. */
 export function isCode(file: string): boolean {
   return !/\.(?:md|mdx|txt)$/i.test(file)
