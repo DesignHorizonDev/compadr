@@ -1,6 +1,13 @@
 // Changes the status of a proposed decision record to accepted, where the
 // record writes it, and keeps the rest of the record as written. A person
 // accepts a decision: this edit only writes what they chose.
+import {
+  datedEntries,
+  headerLines,
+  readDatedStatus,
+  statusSectionLines,
+  type DatedStatusPlace,
+} from './dated-status.ts'
 import { normalizeStatus } from './status.ts'
 
 export class StatusEditError extends Error {}
@@ -50,9 +57,46 @@ function acceptedValue(old: string, french: boolean, date: string): string {
 }
 
 /**
+ * The record with a new entry after the last one of its dated list of states
+ * (`- 2026-11-17: Accepted`), written like that entry. Returns `null` when the
+ * place holds no dated list.
+ */
+function addDatedEntry(
+  markdown: string,
+  place: DatedStatusPlace | null,
+  date: string
+): string | null {
+  if (place === null) return null
+  const entries = datedEntries(place.lines, place)
+  const dated = readDatedStatus(entries)
+  if (dated === null) return null
+  if (dated.status !== 'proposed') {
+    throw new StatusEditError(`the record is ${dated.status}, not proposed`)
+  }
+  const last = entries[entries.length - 1]!
+  const french = entries.some(entry => /proposée|brouillon/i.test(entry.text))
+  const word = french ? 'acceptée' : 'accepted'
+  const first = last.text.charAt(0)
+  const cased =
+    first !== first.toLowerCase()
+      ? word.charAt(0).toUpperCase() + word.slice(1)
+      : word
+  const lines = markdown.split('\n')
+  const at = place.start + last.index
+  const eol = lines[at]!.endsWith('\r') ? '\r' : ''
+  lines.splice(
+    at + 1,
+    0,
+    `${last.bullet}${date}${last.separator}${cased}${eol}`
+  )
+  return lines.join('\n')
+}
+
+/**
  * The record with its status changed to accepted on `date`
  * (YYYY-MM-DD): in the YAML frontmatter, else in a `Status:` line of the
- * header, else in a `## Status` section, as the parser reads it. Throws a
+ * header, else in a `## Status` section, else in dated lines of the header,
+ * as the parser reads it. A dated list of states gets a new entry. Throws a
  * StatusEditError when the record has no status, or is not proposed.
  */
 export function acceptRecordStatus(markdown: string, date: string): string {
@@ -91,6 +135,9 @@ export function acceptRecordStatus(markdown: string, date: string): string {
       markdown.slice(start + line.index + whole.length)
     )
   }
+  const lines = markdown.split('\n').map(line => line.replace(/\r$/, ''))
+  const fromSection = addDatedEntry(markdown, statusSectionLines(lines), date)
+  if (fromSection !== null) return fromSection
   const sectionStatus = STATUS_SECTION.exec(markdown)
   if (sectionStatus !== null) {
     const [whole, before, rest] = sectionStatus as unknown as [
@@ -107,5 +154,15 @@ export function acceptRecordStatus(markdown: string, date: string): string {
       markdown.slice(sectionStatus.index + whole.length)
     )
   }
+  const bodyStart =
+    frontmatter === null
+      ? 0
+      : frontmatter[0].replace(/\r?\n$/, '').split('\n').length
+  const fromHeader = addDatedEntry(
+    markdown,
+    headerLines(lines, bodyStart),
+    date
+  )
+  if (fromHeader !== null) return fromHeader
   throw new StatusEditError('the record writes no status')
 }

@@ -64,3 +64,33 @@ describe('acceptRecordStatus', () => {
     ).toThrow('today is not a date')
   })
 })
+
+describe('acceptRecordStatus on a dated list', () => {
+  it('adds an entry after the latest one', () => {
+    const before =
+      '# 7. Retries\n\n## Status\n\n- 2024-09-02: Drafted\n- 2024-09-05: Edited (Wording)\n\n## Context\n'
+    expect(statusOf(before)).toBe('proposed')
+    const after = accept(before)
+    expect(after).toBe(
+      '# 7. Retries\n\n## Status\n\n- 2024-09-02: Drafted\n- 2024-09-05: Edited (Wording)\n- 2026-11-17: Accepted\n\n## Context\n'
+    )
+    expect(statusOf(after)).toBe('accepted')
+  })
+
+  it('adds a line to the dated lines of the header', () => {
+    const before = '# 7. Retries\n\n2024-10-31: proposed\n\n## Context\n'
+    const after = accept(before)
+    expect(after).toBe(
+      '# 7. Retries\n\n2024-10-31: proposed\n2026-11-17: accepted\n\n## Context\n'
+    )
+    expect(statusOf(after)).toBe('accepted')
+  })
+
+  it('refuses a list whose latest state is not proposed', () => {
+    expect(() =>
+      accept(
+        '# 7. Retries\n\n## Status\n\n- 2024-09-02: Drafted\n- 2024-09-09: Accepted\n'
+      )
+    ).toThrow('the record is accepted, not proposed')
+  })
+})

@@ -4,6 +4,14 @@ import { readAnchors, type RecordedAnchor } from './anchor.ts'
 import { parseAdrFileName } from './adr-file.ts'
 import { AMENDED_BY, AMENDS } from './relation-words.ts'
 import { normalizeStatus, type DecisionStatus } from './status.ts'
+import {
+  datedEntries,
+  headerLines,
+  headerOf,
+  readDatedStatus,
+  statusSectionLines,
+  type DatedStatusPlace,
+} from './dated-status.ts'
 
 /** What Compadr reads in one decision record, before looking at the code. */
 export interface AdrDocument {
@@ -207,23 +215,6 @@ function sortedUnique(numbers: Iterable<number>, without: number): number[] {
   return [...new Set(numbers)].filter(n => n !== without).sort((a, b) => a - b)
 }
 
-/**
- * The header holds the metadata of a record: everything before the first
- * second-level section. A record without sections has no clear end of header,
- * so its header stops after the first paragraph that follows the title.
- */
-function headerOf(lines: readonly string[], bodyStart: number): string[] {
-  const section = lines.findIndex(line => line.startsWith('## '))
-  if (section !== -1) return lines.slice(0, section)
-  const title = lines.findIndex(
-    (line, i) => i >= bodyStart && line.startsWith('# ')
-  )
-  let end = title === -1 ? bodyStart : title + 1
-  while (end < lines.length && lines[end]!.trim() === '') end++
-  while (end < lines.length && lines[end]!.trim() !== '') end++
-  return lines.slice(0, end)
-}
-
 // A heading that records an amendment: "## Amendment (2026-10-10)",
 // "## Amendement du lot J4", "## What this amends", "## Ce que cela amende".
 const AMENDMENT_LEVEL = /^(#{2,6})\s/
@@ -270,6 +261,12 @@ function amendmentSections(
   return { amends, amendedBy }
 }
 
+function datedStatusIn(place: DatedStatusPlace | null) {
+  return place === null
+    ? null
+    : readDatedStatus(datedEntries(place.lines, place))
+}
+
 /** Number of lines, counted like `wc -l` plus a last line without newline. */
 function countLines(text: string): number {
   if (text === '') return 0
@@ -302,13 +299,24 @@ export function parseAdr(path: string, content: string): AdrDocument | null {
       : frontmatterMatch[0].replace(/\n$/, '').split('\n').length
   const header = headerOf(lines, bodyStart).join('\n')
 
+  // The frontmatter, then a `Status:` line of the header, then the `## Status`
+  // section (a dated list of states, or its first line), then dated lines of
+  // the header ("2025-12-09: Accepted").
+  const written = frontmatter?.status ?? STATUS_LINE.exec(header)?.[1] ?? null
+  const dated =
+    written === null
+      ? (datedStatusIn(statusSectionLines(lines)) ??
+        (STATUS_SECTION.test(text)
+          ? null
+          : datedStatusIn(headerLines(lines, bodyStart))))
+      : null
   const rawStatus = (
-    frontmatter?.status ??
-    STATUS_LINE.exec(header)?.[1] ??
+    written ??
+    dated?.raw ??
     STATUS_SECTION.exec(text)?.[1] ??
     ''
   ).trim()
-  const status = normalizeStatus(rawStatus)
+  const status = dated?.status ?? normalizeStatus(rawStatus)
   const date = frontmatter?.date ?? DATE_LINE.exec(header)?.[1] ?? null
 
   const titleLine = lines.slice(bodyStart).find(line => line.startsWith('# '))
