@@ -77,6 +77,10 @@ export function withoutExcluded(
     ])
     if (paths.some(path => excludedFromAssist(settings, path))) {
       excluded.push(...files.map(file => file.path))
+    } else if (files.length === 0 && FILE_START.test(part)) {
+      // A file whose paths cannot be read cannot be compared with the
+      // settings: it stays in the repository.
+      excluded.push(part.split('\n', 1)[0]!.trim())
     } else {
       kept.push(part)
     }

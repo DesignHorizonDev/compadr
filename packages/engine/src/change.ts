@@ -30,15 +30,96 @@ type ReadFile = ChangedFile & { hunks?: boolean }
 
 const HUNK = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/
 
+const C_ESCAPES: Record<string, number> = {
+  a: 7,
+  b: 8,
+  t: 9,
+  n: 10,
+  v: 11,
+  f: 12,
+  r: 13,
+  '"': 34,
+  '\\': 92,
+}
+
+/**
+ * The path that git wrote between quotes: git quotes a path that holds a
+ * control character, a quote, a backslash or, unless `core.quotePath` is
+ * off, a byte outside ASCII, which it writes in octal (`priv\303\251` for
+ * `privé`). A path without quotes is returned as it is.
+ */
+export function unquoteGitPath(raw: string): string {
+  if (raw.length < 2 || !raw.startsWith('"') || !raw.endsWith('"')) return raw
+  const inner = raw.slice(1, -1)
+  const bytes: number[] = []
+  const encoder = new TextEncoder()
+  for (let i = 0; i < inner.length; i++) {
+    const char = inner[i]!
+    if (char !== '\\') {
+      bytes.push(...encoder.encode(char))
+      continue
+    }
+    const octal = /^[0-3][0-7]{2}/.exec(inner.slice(i + 1, i + 4))
+    if (octal) {
+      bytes.push(parseInt(octal[0], 8))
+      i += 3
+      continue
+    }
+    const next = inner[i + 1]
+    const code = next === undefined ? undefined : C_ESCAPES[next]
+    if (code === undefined) {
+      // Not an escape of git: the backslash stays.
+      bytes.push(92)
+      continue
+    }
+    bytes.push(code)
+    i += 1
+  }
+  return new TextDecoder().decode(new Uint8Array(bytes))
+}
+
+const QUOTED = String.raw`"(?:[^"\\]|\\.)*"`
+const QUOTED_ONLY = new RegExp(`^${QUOTED}$`)
+const QUOTED_FIRST = new RegExp(`^(${QUOTED}) (.+)$`)
+
+function withoutPrefix(path: string, prefix: string): string {
+  return path.startsWith(prefix) ? path.slice(prefix.length) : path
+}
+
+/**
+ * The old and new paths of a `diff --git` line. Git quotes each path on its
+ * own: a rename can have one quoted path and one plain path.
+ */
+function headerPaths(line: string): [string, string] | null {
+  if (!line.startsWith('diff --git ')) return null
+  const rest = line.slice(11)
+  const pair = (from: string, to: string): [string, string] => [
+    withoutPrefix(unquoteGitPath(from), 'a/'),
+    withoutPrefix(unquoteGitPath(to), 'b/'),
+  ]
+  if (rest.startsWith('"')) {
+    const first = QUOTED_FIRST.exec(rest)
+    if (!first) return null
+    // A new path that opens a quote and does not close it cannot be read.
+    if (first[2]!.startsWith('"') && !QUOTED_ONLY.test(first[2]!)) return null
+    return pair(first[1]!, first[2]!)
+  }
+  // A plain old path, then a quoted new path.
+  const split = rest.indexOf(' "b/')
+  if (split > 0 && QUOTED_ONLY.test(rest.slice(split + 1))) {
+    return pair(rest.slice(0, split), rest.slice(split + 1))
+  }
+  const plain = /^a\/(.+?) b\/(.+)$/.exec(rest) ?? /^(\S+) (\S+)$/.exec(rest)
+  return plain ? [plain[1]!, plain[2]!] : null
+}
+
 /** `"a/x y.ts"\t2026-01-01` → `x y.ts`. */
 function diffPath(raw: string, prefix: string): string | null {
-  let path = raw.split('\t')[0]!.trim()
-  if (path.startsWith('"') && path.endsWith('"')) {
-    path = path.slice(1, -1).replace(/\\(["\\])/g, '$1')
-  }
+  const text = raw.trim()
+  const quoted = new RegExp(`^${QUOTED}`).exec(text)
+  const path = quoted ? unquoteGitPath(quoted[0]) : text.split('\t')[0]!.trim()
   if (path === '/dev/null') return null
-  if (path.startsWith(prefix)) path = path.slice(prefix.length)
-  return normalizeRepositoryPath(path)
+  return normalizeRepositoryPath(withoutPrefix(path, prefix))
 }
 
 /**
@@ -103,11 +184,9 @@ export function parseUnifiedDiff(diff: string): ChangedFile[] {
       continue
     }
     closeRun()
-    const git =
-      /^diff --git "?a\/(.+?)"? "?b\/(.+?)"?$/.exec(line) ??
-      /^diff --git (\S+) (\S+)$/.exec(line)
+    const git = headerPaths(line)
     if (git) {
-      open(normalizeRepositoryPath(git[1]!), normalizeRepositoryPath(git[2]!))
+      open(normalizeRepositoryPath(git[0]), normalizeRepositoryPath(git[1]))
       continue
     }
     if (line.startsWith('--- ')) {
@@ -148,10 +227,10 @@ export function parseUnifiedDiff(diff: string): ChangedFile[] {
       current.status = 'deleted'
       current.path = current.from ?? current.path
     } else if (line.startsWith('rename from ')) {
-      current.from = normalizeRepositoryPath(line.slice(12))
+      current.from = normalizeRepositoryPath(unquoteGitPath(line.slice(12)))
       current.status = 'renamed'
     } else if (line.startsWith('rename to ')) {
-      current.path = normalizeRepositoryPath(line.slice(10))
+      current.path = normalizeRepositoryPath(unquoteGitPath(line.slice(10)))
       current.status = 'renamed'
     }
   }

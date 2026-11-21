@@ -97,6 +97,55 @@ describe('parseUnifiedDiff', () => {
     ])
   })
 
+  it('reads the paths that git writes between quotes', () => {
+    const diff = [
+      String.raw`diff --git "a/src/priv\303\251/a.ts" "b/src/priv\303\251/a.ts"`,
+      'index 1111111..2222222 100644',
+      String.raw`--- "a/src/priv\303\251/a.ts"`,
+      String.raw`+++ "b/src/priv\303\251/a.ts"`,
+      '@@ -1 +1 @@',
+      '-old',
+      '+new',
+      // A binary file has no --- and +++ lines: the header alone names it.
+      String.raw`diff --git "a/src/tab\tdir/g.bin" "b/src/tab\tdir/g.bin"`,
+      'index 3333333..4444444 100644',
+      'Binary files differ',
+      // Git quotes each path on its own.
+      String.raw`diff --git a/src/plain.ts "b/src/\346\227\245\346\234\254/say \"hi\".ts"`,
+      'similarity index 100%',
+      'rename from src/plain.ts',
+      String.raw`rename to "src/\346\227\245\346\234\254/say \"hi\".ts"`,
+      String.raw`diff --git "a/src/\303\251t\303\251.ts" b/src/summer.ts`,
+      'similarity index 100%',
+      String.raw`rename from "src/\303\251t\303\251.ts"`,
+      'rename to src/summer.ts',
+      '',
+    ].join('\n')
+    expect(
+      parseUnifiedDiff(diff).map(({ path, from, status }) => ({
+        path,
+        from,
+        status,
+      }))
+    ).toEqual([
+      { path: 'src/privé/a.ts', from: 'src/privé/a.ts', status: 'modified' },
+      {
+        path: 'src/tab\tdir/g.bin',
+        from: 'src/tab\tdir/g.bin',
+        status: 'modified',
+      },
+      { path: 'src/日本/say "hi".ts', from: 'src/plain.ts', status: 'renamed' },
+      { path: 'src/summer.ts', from: 'src/été.ts', status: 'renamed' },
+    ])
+  })
+
+  it('reads a quoted path in linear time', () => {
+    const started = performance.now()
+    parseUnifiedDiff(`diff --git a/x ${' "b/'.repeat(100_000)}\n`)
+    parseUnifiedDiff(`diff --git "a/${'\\'.repeat(100_001)}\n`)
+    expect(performance.now() - started).toBeLessThan(1000)
+  })
+
   it('finds no file in a text that is not a diff', () => {
     expect(parseUnifiedDiff('Some prose.\n')).toEqual([])
   })

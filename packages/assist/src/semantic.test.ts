@@ -73,6 +73,49 @@ describe('withoutExcluded', () => {
   })
 })
 
+describe('withoutExcluded, on paths that git writes between quotes', () => {
+  const settings = {
+    assist: { semantic: true, exclude: ['src/privé', 'src/tab\tdir'] },
+  }
+  const quoted = (path: string, secret: string) =>
+    [
+      `diff --git "a/${path}" "b/${path}"`,
+      `--- "a/${path}"`,
+      `+++ "b/${path}"`,
+      '@@ -1 +1 @@',
+      '-A=OLD',
+      `+A=${secret}`,
+      '',
+    ].join('\n')
+
+  it('keeps out an excluded path with letters outside ASCII or a tab', () => {
+    const text = [
+      diff,
+      quoted(String.raw`src/priv\303\251/a.ts`, 'SECRETONE'),
+      quoted(String.raw`src/tab\tdir/g.ts`, 'SECRETTWO'),
+      // A binary file has no --- and +++ lines.
+      String.raw`diff --git "a/src/priv\303\251/k.bin" "b/src/priv\303\251/k.bin"`,
+      '\nBinary files differ\n',
+    ].join('')
+    expect(withoutExcluded(text, settings)).toEqual({
+      diff,
+      excluded: ['src/privé/a.ts', 'src/tab\tdir/g.ts', 'src/privé/k.bin'],
+    })
+  })
+
+  it('keeps out a file whose header cannot be read', () => {
+    const broken = [
+      String.raw`diff --git "a/src/priv\303\251/a.ts`,
+      'Binary files differ',
+      '',
+    ].join('\n')
+    expect(withoutExcluded(`${diff}${broken}`, settings)).toEqual({
+      diff,
+      excluded: [String.raw`diff --git "a/src/priv\303\251/a.ts`],
+    })
+  })
+})
+
 describe('withoutExcluded, on a diff without diff --git lines', () => {
   it('keeps out the part that holds an excluded file', () => {
     const plain = [
