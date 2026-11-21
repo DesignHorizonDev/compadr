@@ -37,6 +37,12 @@ export interface FolderReports {
 }
 
 /** Where the routes read the reports: a folder, or live repositories. */
+/**
+ * The answer to a fault of the server. Its message, which may name a path
+ * of the machine or quote git, goes to the output of the console only.
+ */
+export const FAULT = 'The console could not answer: its output tells why'
+
 export interface ReportFolder {
   list():
     | (ReportList & { problems: string[] })
@@ -275,9 +281,8 @@ export async function handleReportRequest(
     if (report === undefined) send(response, 404, { error: 'No such report' })
     else send(response, 200, report)
   } catch (error) {
-    const message = (error as Error).message
-    warn(message)
-    send(response, 500, { error: message })
+    warn((error as Error).message)
+    send(response, 500, { error: FAULT })
   }
 }
 

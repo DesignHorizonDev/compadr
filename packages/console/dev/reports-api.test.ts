@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { makeReport } from '../src/testing/report.ts'
-import { handleReportRequest, reportFolder } from './reports-api.ts'
+import { FAULT, handleReportRequest, reportFolder } from './reports-api.ts'
 
 let directory: string
 const main = makeReport({ ref: 'main' })
@@ -184,15 +184,18 @@ describe('handleReportRequest', () => {
     expect((await request('GET', '/%E0%A4%A')).status).toBe(404)
   })
 
-  it('answers 500 with the reason when the folder cannot be read', async () => {
+  it('answers 500 without the reason, which goes to the output', async () => {
     const missing = join(directory, 'missing')
     for (const url of ['/', '/api-main']) {
       const { status, body, warnings } = await request('GET', url, missing)
       expect(status).toBe(500)
-      expect((body as { error: string }).error).toMatch(
-        /^The reports folder .*missing cannot be read: ENOENT/
-      )
-      expect(warnings).toEqual([(body as { error: string }).error])
+      // The reason names a path of the machine.
+      expect(body).toEqual({ error: FAULT })
+      expect(warnings).toEqual([
+        expect.stringMatching(
+          /^The reports folder .*missing cannot be read: ENOENT/
+        ),
+      ])
     }
   })
 
@@ -221,7 +224,7 @@ describe('the recommendations route', () => {
     const wrong = await request('GET', '/api-main/recommendations/8')
     expect(wrong).toMatchObject({
       status: 500,
-      body: { error: 'api-main.accept-8.json holds no accept suggestion' },
+      body: { error: FAULT },
     })
   })
 })
@@ -243,9 +246,7 @@ describe('the consolidations route', () => {
     expect((await request('GET', '/notes/consolidations/3')).status).toBe(404)
     expect(await request('GET', '/api-main/consolidations/4')).toMatchObject({
       status: 500,
-      body: {
-        error: 'api-main.consolidate-4.json holds no consolidate suggestion',
-      },
+      body: { error: FAULT },
     })
   })
 })

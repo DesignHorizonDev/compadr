@@ -8,9 +8,10 @@ import { delimiter, isAbsolute, join } from 'node:path'
 const found = new Map<string, string>()
 
 /**
- * The executable of `name` in the folders of PATH, on Windows. Elsewhere,
- * and when PATH has no such file, the name itself: the system then reports
- * the missing program as before.
+ * The executable of `name` in the folders of PATH, on Windows; elsewhere,
+ * the name itself. On Windows, a program that PATH does not hold is an
+ * error with the code ENOENT, as a missing program is: the bare name would
+ * be looked for in the current folder.
  */
 export function programPath(
   name: string,
@@ -20,16 +21,16 @@ export function programPath(
   if (platform !== 'win32') return name
   const known = found.get(name)
   if (known !== undefined) return known
-  let program = name
-  for (const folder of (path ?? '').split(delimiter)) {
-    // A relative folder of PATH is read from the current folder too.
+  for (const entry of (path ?? '').split(delimiter)) {
+    // A folder of PATH may be quoted; a relative one is read from the
+    // current folder, and is left out.
+    const folder = entry.trim().replace(/^"(.*)"$/, '$1')
     if (folder === '' || !isAbsolute(folder)) continue
     const file = join(folder, `${name}.exe`)
     if (existsSync(file)) {
-      program = file
-      break
+      found.set(name, file)
+      return file
     }
   }
-  found.set(name, program)
-  return program
+  throw Object.assign(new Error(`${name} is not in PATH`), { code: 'ENOENT' })
 }

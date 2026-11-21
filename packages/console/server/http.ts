@@ -9,7 +9,11 @@ import {
 import { timingSafeEqual } from 'node:crypto'
 import { isIP } from 'node:net'
 import { extname, join, normalize, sep } from 'node:path'
-import { handleReportRequest, type ReportFolder } from '../dev/reports-api.ts'
+import {
+  FAULT,
+  handleReportRequest,
+  type ReportFolder,
+} from '../dev/reports-api.ts'
 import { REPORTS_API } from '../src/reports.ts'
 import { REVIEWS_API, type ReviewList } from '../src/reviews.ts'
 import { ASSIST_API, type DraftDecisionOutcome } from '../src/assist.ts'
@@ -177,12 +181,6 @@ async function serveReviews(
     response.end(JSON.stringify({ error: FAULT }))
   }
 }
-
-/**
- * The answer to a fault of the server. Its message, which may name a path
- * of the machine or quote git, goes to the output of the console only.
- */
-const FAULT = 'The console could not answer: its output tells why'
 
 /** Largest body of a request to the drafts. */
 const MAX_BODY = 64 * 1024
@@ -567,8 +565,14 @@ export function fromThisSite(request: IncomingMessage): boolean {
   }
 }
 
-/** Name of the cookie that carries the token of a console open to the network. */
-export const TOKEN_COOKIE = 'compadr-console-token'
+/**
+ * Name of the cookie that carries the token of a console open to the
+ * network. A cookie is shared by every port of a host: the name holds the
+ * port, so that two consoles of one machine keep their own token.
+ */
+export function tokenCookie(port: number | undefined): string {
+  return `compadr-console-token-${port ?? 0}`
+}
 
 function sameSecret(given: string, token: string): boolean {
   const a = Buffer.from(given)
@@ -589,6 +593,7 @@ export function withToken(
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
       response.setHeader(name, value)
     }
+    const name = tokenCookie(request.socket.localPort)
     const url = new URL(request.url ?? '/', 'http://localhost')
     const given = url.searchParams.get('token')
     if (given !== null && sameSecret(given, token)) {
@@ -596,20 +601,19 @@ export function withToken(
       response.statusCode = 303
       response.setHeader(
         'set-cookie',
-        `${TOKEN_COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/`
+        `${name}=${token}; HttpOnly; SameSite=Strict; Path=/`
       )
       response.setHeader('location', `${url.pathname}${url.search}`)
       response.end()
       return
     }
-    const cookie = (request.headers.cookie ?? '')
+    // Any cookie of that name may hold the token.
+    const held = (request.headers.cookie ?? '')
       .split(';')
       .map(part => part.trim())
-      .find(part => part.startsWith(`${TOKEN_COOKIE}=`))
-    if (
-      cookie === undefined ||
-      !sameSecret(cookie.slice(TOKEN_COOKIE.length + 1), token)
-    ) {
+      .filter(part => part.startsWith(`${name}=`))
+      .some(part => sameSecret(part.slice(name.length + 1), token))
+    if (!held) {
       response.statusCode = 401
       response.setHeader('content-type', 'text/plain; charset=utf-8')
       response.end(

@@ -90,7 +90,8 @@ Options:
   --ref <ref>        Git reference to follow (default: HEAD)
   --adr-dir <dir>    Folder of the decision records (default: docs/adr)
   --port <port>      Port to listen on (default: ${DEFAULT_PORT})
-  --host <host>      Address to listen on (default: 127.0.0.1)
+  --host <host>      Address to listen on (default: 127.0.0.1). Another
+                     address prints the address with the token of the console
   --cache-dir <dir>  Folder of the reports on disk, outside the repositories
                      (default: $XDG_CACHE_HOME/compadr or ~/.cache/compadr)
   --no-cache         Keep the reports in memory only
@@ -400,9 +401,10 @@ export async function runConsole(
       output.err(`compadr-console: ${error.message}`)
       return 1
     }
-    // The server could not listen: the port is taken, refused, or the
-    // address is not one of this machine.
-    if ((error as { syscall?: unknown }).syscall === 'listen') {
+    // The server could not listen: the port is taken, refused, the address
+    // is not one of this machine, or its name does not resolve.
+    const syscall = (error as { syscall?: unknown }).syscall
+    if (syscall === 'listen' || syscall === 'getaddrinfo') {
       output.err(`compadr-console: ${(error as Error).message}`)
       return 1
     }

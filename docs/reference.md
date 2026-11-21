@@ -31,7 +31,9 @@ yarn build
 node packages/console/dist/server/console.js ../my-repo ../other-repo --ref main
 ```
 
-The server reads each repository at its reference, without writing to it, and listens on `127.0.0.1:4180` by default. It computes a drift report again only when the commit of the reference changes. It keeps the reports of the last commits in the same folder as `compadr mcp` (`--cache-dir`, `--no-cache`), so a new server or a new MCP server answers at once on a commit already analysed. The server answers only requests addressed to `localhost`, to an IP address or to the `--host` name, so that a page of another site cannot read the decisions through a domain name of its own.
+The server reads each repository at its reference, without writing to it, and listens on `127.0.0.1:4180` by default. It computes a drift report again only when the commit of the reference changes. It keeps the reports of the last commits in the same folder as `compadr mcp` (`--cache-dir`, `--no-cache`), so a new server or a new MCP server answers at once on a commit already analysed. The server answers only requests addressed to `localhost`, to an IP address or to the `--host` name, so that a page of another site cannot read the decisions through a domain name of its own. The API also refuses a request that the browser names as coming from another site, and its answers are never kept in a cache.
+
+With `--host` on an address other than this machine, the console creates a random token at start and prints its address with the token (`http://<host>:<port>/?token=…`). The first visit keeps the token in a cookie of the site, and every request without it gets 401. The console warns at start in that case.
 
 `GET /api/reviews` lists the branches that propose decisions: each local or remote-tracking branch that adds or changes a record with the status "proposed", compared with the commit where it leaves the followed reference. With the GitHub CLI (`gh`), each branch carries its open pull request. The report of a branch is served on the report routes, and is computed when the console first asks for it.
 
@@ -41,7 +43,7 @@ The Reviews view lists those proposed decisions. The review of one shows its fea
 |---|---|---|
 | `--ref` | Git reference to follow | `HEAD` |
 | `--adr-dir` | Folder of the decision records | `docs/adr` |
-| `--port`, `--host` | Address to listen on | `4180`, `127.0.0.1` |
+| `--port`, `--host` | Address to listen on; another address than this machine asks for the token of the printed address | `4180`, `127.0.0.1` |
 | `--cache-dir` | Folder of the reports on disk, outside the repositories | `$XDG_CACHE_HOME/compadr` or `~/.cache/compadr` |
 | `--no-cache` | Keep the reports in memory only | |
 | `--no-github` | Do not ask `gh` for the pull requests of the branches under review | |
@@ -50,7 +52,7 @@ The Reviews view lists those proposed decisions. The review of one shows its fea
 
 The actions of correction of the pages add their commit to a local draft of each repository, as `--draft` does on the command line (see [Drafts](#drafts)). "Mark as checked" on the page of a decision and the anchor proposed for a link each have an "Add to the draft" button. The Draft view lists the commits of the draft and gives the command that publishes it as one pull request, `compadr draft publish`: the console never publishes. The report of the draft joins the list of reports, next to the report of the followed reference, so that the console shows the signals that the draft resolves. The drafts stay in the cache folder, even with `--no-cache`.
 
-The server writes only in its clone of the drafts, never in the repositories, and nothing leaves the machine. A request that writes (`POST /api/drafts/<id>/checks` or `/anchors`) must carry the JSON type and the origin of the console: a page of another site cannot fill a draft. These checks stop browsers only: with `--host` on an address that other machines reach, any program on the network can fill the drafts, which stay in the clone of the cache. Use `--no-draft` in that case. With `--no-draft`, the routes of the drafts answer 404 and the pages give the commands of the command line, as before.
+The server writes only in its clone of the drafts, never in the repositories, and nothing leaves the machine. A request that writes (`POST /api/drafts/<id>/checks` or `/anchors`) must carry the JSON type and the origin of the console: a page of another site cannot fill a draft. With `--host` on an address that other machines reach, a request also needs the token of the console: a program on the network without it cannot read the reports or fill the drafts. With `--no-draft`, the routes of the drafts answer 404 and the pages give the commands of the command line, as before.
 
 The console reads its reports on `GET /api/reports` (the list) and `GET /api/reports/<id>`. For development, the Vite server serves the same routes from a folder of saved reports:
 

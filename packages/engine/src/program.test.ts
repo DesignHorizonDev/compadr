@@ -16,13 +16,15 @@ describe('programPath', () => {
   })
 
   it('reads the program from the absolute folders of PATH on Windows', () => {
-    const path = ['bin', '', join(folder, 'bin')].join(delimiter)
+    const path = ['bin', '', `"${join(folder, 'bin')}"`].join(delimiter)
     expect(programPath('tool', 'win32', path)).toBe(
       join(folder, 'bin', 'tool.exe')
     )
   })
 
-  it('keeps the name when PATH has no such program', () => {
-    expect(programPath('absent', 'win32', join(folder, 'bin'))).toBe('absent')
+  it('refuses on Windows a program that PATH does not hold', () => {
+    expect(() => programPath('absent', 'win32', join(folder, 'bin'))).toThrow(
+      expect.objectContaining({ code: 'ENOENT' })
+    )
   })
 })

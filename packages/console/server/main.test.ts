@@ -1,5 +1,11 @@
 // @vitest-environment node
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { request, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -310,9 +316,18 @@ describe('compadr-console, against another site and the network', () => {
     expect(opened.status).toBe(303)
     expect(opened.headers.location).toBe('/reports')
     const cookie = String(opened.headers['set-cookie']).split(';')[0]!
+    // The cookie names the port: two consoles of one machine keep their token.
+    expect(
+      cookie.startsWith(`compadr-console-token-${new URL(url).port}=`)
+    ).toBe(true)
     expect(String(opened.headers['set-cookie'])).toContain(
       'HttpOnly; SameSite=Strict'
     )
+    // Another cookie of the same name does not hide the right one.
+    const stale = `${cookie.split('=')[0]}=old; ${cookie}`
+    expect(
+      (await send(`${url}/api/reports`, { headers: { cookie: stale } })).status
+    ).toBe(200)
     expect(
       (await send(`${url}/api/reports`, { headers: { cookie } })).status
     ).toBe(200)
@@ -326,14 +341,38 @@ describe('compadr-console, against another site and the network', () => {
   })
 
   it('stops with a message when it cannot listen on the address', async () => {
-    const { result, err } = await start([
-      fixture.path,
-      '--no-cache',
-      '--host',
-      '192.0.2.1',
-    ])
-    expect(result).toBe(1)
-    expect(err).toContain('compadr-console: listen')
+    for (const [host, call] of [
+      ['192.0.2.1', 'listen'],
+      ['no-such-host.invalid', 'getaddrinfo'],
+    ] as const) {
+      const { result, err } = await start([
+        fixture.path,
+        '--no-cache',
+        '--host',
+        host,
+      ])
+      expect(result).toBe(1)
+      expect(err).toContain(`compadr-console: ${call}`)
+    }
+  })
+
+  it('keeps its cache folder to its own account', async () => {
+    const xdg = mkdtempSync(join(tmpdir(), 'compadr-xdg-'))
+    const before = {
+      xdg: process.env.XDG_CACHE_HOME,
+      mask: process.umask(0o022),
+    }
+    process.env.XDG_CACHE_HOME = xdg
+    try {
+      const { result } = await start([fixture.path])
+      if (typeof result === 'number') throw new Error(`exit ${result}`)
+      expect(statSync(join(xdg, 'compadr')).mode & 0o777).toBe(0o700)
+    } finally {
+      process.umask(before.mask)
+      if (before.xdg === undefined) delete process.env.XDG_CACHE_HOME
+      else process.env.XDG_CACHE_HOME = before.xdg
+      rmSync(xdg, { recursive: true, force: true })
+    }
   })
 })
 
