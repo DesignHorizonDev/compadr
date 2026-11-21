@@ -1,6 +1,11 @@
-# Compadr
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="packages/tokens/assets/logo-dark.svg">
+    <img alt="Compadr" src="packages/tokens/assets/logo-light.svg" width="320">
+  </picture>
+</h1>
 
-Know what was decided, and whether the code still follows it.
+<p align="center">Know what was decided, and whether the code still follows it.</p>
 
 Compadr links each architecture decision record (ADR) to the code it governs, reports when the code moves away from it, and gives your coding agents the decisions in force before they write. The git repository stays the source of truth.
 
