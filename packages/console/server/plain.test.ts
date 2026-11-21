@@ -308,7 +308,7 @@ describe('the settings of the plain language', () => {
     const console = await start({ args: ['--no-cache', '--host', '0.0.0.0'] })
     try {
       expect(console.err.join('\n')).toContain(
-        'the console listens on 0.0.0.0, so another machine that reaches the port can ask the assist service, at your cost'
+        'the console listens on 0.0.0.0. Another machine that reaches the port needs the token of the printed address to read the repositories and ask the assist service, at your cost'
       )
     } finally {
       await console.close()

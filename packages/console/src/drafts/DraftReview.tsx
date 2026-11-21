@@ -7,6 +7,7 @@ import type {
   PortalSource,
   Verdict,
 } from '../portal.ts'
+import { safeHref } from '../links.ts'
 
 type Loadable<T> =
   | { state: 'loading' }
@@ -138,7 +139,7 @@ export function DraftReview({
             <>
               {' '}
               as{' '}
-              <a href={latest.pullRequest} rel="noreferrer noopener">
+              <a href={safeHref(latest.pullRequest)} rel="noreferrer noopener">
                 {latest.pullRequest}
               </a>
             </>

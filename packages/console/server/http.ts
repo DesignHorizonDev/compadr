@@ -6,9 +6,14 @@ import {
   type Server,
   type ServerResponse,
 } from 'node:http'
+import { timingSafeEqual } from 'node:crypto'
 import { isIP } from 'node:net'
 import { extname, join, normalize, sep } from 'node:path'
-import { handleReportRequest, type ReportFolder } from '../dev/reports-api.ts'
+import {
+  FAULT,
+  handleReportRequest,
+  type ReportFolder,
+} from '../dev/reports-api.ts'
 import { REPORTS_API } from '../src/reports.ts'
 import { REVIEWS_API, type ReviewList } from '../src/reviews.ts'
 import { ASSIST_API, type DraftDecisionOutcome } from '../src/assist.ts'
@@ -171,10 +176,9 @@ async function serveReviews(
     response.statusCode = 200
     response.end(JSON.stringify({ reviews, changes } satisfies ReviewList))
   } catch (error) {
-    const message = (error as Error).message
-    warn(message)
+    warn((error as Error).message)
     response.statusCode = 500
-    response.end(JSON.stringify({ error: message }))
+    response.end(JSON.stringify({ error: FAULT }))
   }
 }
 
@@ -201,20 +205,29 @@ export function sameOrigin(request: IncomingMessage): boolean {
   }
 }
 
+/** A body larger than MAX_BODY: the answer is 413. */
+class TooLargeError extends DraftRequestError {}
+
 function readBody(request: IncomingMessage): Promise<unknown> {
   return new Promise((done, fail) => {
     const chunks: Buffer[] = []
     let size = 0
+    let tooLarge = false
     request.on('data', (chunk: Buffer) => {
+      if (tooLarge) return
       size += chunk.length
       if (size > MAX_BODY) {
-        fail(new DraftRequestError('the request is too large'))
-        request.destroy()
+        // The rest of the body is read and dropped, so that the answer
+        // reaches the client before the connection closes.
+        tooLarge = true
+        chunks.length = 0
+        fail(new TooLargeError('the request is too large'))
         return
       }
       chunks.push(chunk)
     })
     request.on('end', () => {
+      if (tooLarge) return
       try {
         done(JSON.parse(Buffer.concat(chunks).toString('utf8')))
       } catch {
@@ -336,11 +349,14 @@ async function serveDrafts(
     send(200, state)
   } catch (error) {
     const message = (error as Error).message
-    if (refused(error)) {
+    if (error instanceof TooLargeError) {
+      response.setHeader('connection', 'close')
+      send(413, { error: message })
+    } else if (refused(error)) {
       send(400, { error: message })
     } else {
       warn(message)
-      send(500, { error: message })
+      send(500, { error: FAULT })
     }
   }
 }
@@ -531,6 +547,85 @@ async function serveDraftDecision(
 }
 
 /**
+ * Whether a request of the API may come from a page of the console. A page
+ * of another site can still make the browser send a GET, such as the source
+ * of an image, and each one makes the console read git: the browser names
+ * the site of such a request, and the server refuses it. A request without
+ * these headers comes from a program, which the Host check already limits.
+ */
+export function fromThisSite(request: IncomingMessage): boolean {
+  const site = request.headers['sec-fetch-site']
+  if (site === 'cross-site' || site === 'same-site') return false
+  const origin = request.headers.origin
+  if (origin === undefined) return true
+  try {
+    return new URL(origin).host === request.headers.host
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Name of the cookie that carries the token of a console open to the
+ * network. A cookie is shared by every port of a host: the name holds the
+ * port, so that two consoles of one machine keep their own token.
+ */
+export function tokenCookie(port: number | undefined): string {
+  return `compadr-console-token-${port ?? 0}`
+}
+
+function sameSecret(given: string, token: string): boolean {
+  const a = Buffer.from(given)
+  const b = Buffer.from(token)
+  return a.length === b.length && timingSafeEqual(a, b)
+}
+
+/**
+ * Requires the token of the console on every request. The address that the
+ * console prints holds it once (`?token=`): the server then keeps it in a
+ * cookie that only this site sends, and leads to the same page without it.
+ */
+export function withToken(
+  token: string,
+  handle: (request: IncomingMessage, response: ServerResponse) => void
+): (request: IncomingMessage, response: ServerResponse) => void {
+  return (request, response) => {
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+      response.setHeader(name, value)
+    }
+    const name = tokenCookie(request.socket.localPort)
+    const url = new URL(request.url ?? '/', 'http://localhost')
+    const given = url.searchParams.get('token')
+    if (given !== null && sameSecret(given, token)) {
+      url.searchParams.delete('token')
+      response.statusCode = 303
+      response.setHeader(
+        'set-cookie',
+        `${name}=${token}; HttpOnly; SameSite=Strict; Path=/`
+      )
+      response.setHeader('location', `${url.pathname}${url.search}`)
+      response.end()
+      return
+    }
+    // Any cookie of that name may hold the token.
+    const held = (request.headers.cookie ?? '')
+      .split(';')
+      .map(part => part.trim())
+      .filter(part => part.startsWith(`${name}=`))
+      .some(part => sameSecret(part.slice(name.length + 1), token))
+    if (!held) {
+      response.statusCode = 401
+      response.setHeader('content-type', 'text/plain; charset=utf-8')
+      response.end(
+        'Open the address that compadr-console printed: it holds the token of the console'
+      )
+      return
+    }
+    handle(request, response)
+  }
+}
+
+/**
  * Answers every request of the console: the report, draft and review
  * routes, then the pages. `knownHost` tells whether the server answers a
  * `Host` header.
@@ -560,6 +655,22 @@ export function consoleHandler(
       request.url ?? '/',
       'http://localhost'
     )
+    if (path === '/api' || path.startsWith('/api/')) {
+      // An answer of the API describes the repositories at one moment.
+      if (!response.hasHeader('cache-control')) {
+        response.setHeader('cache-control', 'no-store')
+      }
+      if (!fromThisSite(request)) {
+        response.statusCode = 403
+        response.setHeader('content-type', 'application/json')
+        response.end(
+          JSON.stringify({
+            error: 'The request does not come from the console',
+          })
+        )
+        return
+      }
+    }
     if (path === REPORTS_API || path.startsWith(`${REPORTS_API}/`)) {
       // The report routes read the path after REPORTS_API.
       request.url = `${path.slice(REPORTS_API.length) || '/'}${search}`
@@ -589,15 +700,16 @@ export function consoleServer(
   reports: ConsoleReports,
   warn: (message: string) => void,
   listen: string,
-  drafts: ConsoleDrafts | null = null
+  drafts: ConsoleDrafts | null = null,
+  /** Required on each request when set: the console is open to the network. */
+  token?: string
 ): Server {
-  return createServer(
-    consoleHandler(
-      pages,
-      reports,
-      warn,
-      host => allowedHost(host, listen),
-      drafts
-    )
+  const handle = consoleHandler(
+    pages,
+    reports,
+    warn,
+    host => allowedHost(host, listen),
+    drafts
   )
+  return createServer(token === undefined ? handle : withToken(token, handle))
 }

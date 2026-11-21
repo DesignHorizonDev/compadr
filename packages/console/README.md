@@ -13,7 +13,7 @@ The console opens on `http://127.0.0.1:4180`. It shows the drift of the decision
 |---|---|---|
 | `--ref` | Git reference to follow | `HEAD` |
 | `--adr-dir` | Folder of the decision records | `docs/adr` |
-| `--port`, `--host` | Address to listen on | `4180`, `127.0.0.1` |
+| `--port`, `--host` | Address to listen on; another address than this machine asks for the token of the printed address | `4180`, `127.0.0.1` |
 | `--cache-dir` | Folder of the reports on disk, outside the repositories | `$XDG_CACHE_HOME/compadr` or `~/.cache/compadr` |
 | `--no-cache` | Keep the reports in memory only | |
 | `--no-github` | Do not ask `gh` for the pull requests of the branches under review | |
@@ -22,7 +22,7 @@ The server computes a drift report again only when the commit of the reference c
 
 ## Plain language
 
-With `COMPADR_ASSIST_URL` and `COMPADR_ASSIST_TOKEN` in its environment, the console gives the page of each decision the button "Read in plain language". The server sends the record to the assist service only when a person clicks, and each new version costs. It keeps each version by the service and the text of the record, in `<cache-dir>/plain/` (in memory with `--no-cache`). To ask for a new version of a record that did not change, for example after an update of the service, delete that folder. A record that `assist.exclude` of `compadr.yml` names never leaves the machine. The routes are `GET /api/assist`, and `GET` or `POST /api/assist/:id/plain/:n`. Keep `--host` on this machine: another machine that reaches the port could ask for versions at your cost, and the console warns at start.
+With `COMPADR_ASSIST_URL` and `COMPADR_ASSIST_TOKEN` in its environment, the console gives the page of each decision the button "Read in plain language". The server sends the record to the assist service only when a person clicks, and each new version costs. It keeps each version by the service and the text of the record, in `<cache-dir>/plain/` (in memory with `--no-cache`). To ask for a new version of a record that did not change, for example after an update of the service, delete that folder. A record that `assist.exclude` of `compadr.yml` names never leaves the machine. The routes are `GET /api/assist`, and `GET` or `POST /api/assist/:id/plain/:n`. With `--host` on an address other than this machine, the console prints its address with a token, and a request without the token gets 401: only the people who hold the address can ask for versions, at your cost. The console warns at start in that case.
 
 ## License
 

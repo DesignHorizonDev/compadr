@@ -3,6 +3,7 @@
 // a GitHub remote or without network, the reviews show their branch alone.
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
+import { programPath } from '@compadr/engine'
 import type { PullRequestLink } from '../src/reviews.ts'
 
 const exec = promisify(execFile)
@@ -17,7 +18,7 @@ export type GhRunner = (repository: string, args: string[]) => Promise<string>
 
 export const runGh: GhRunner = async (repository, args) =>
   (
-    await exec('gh', args, {
+    await exec(programPath('gh'), args, {
       cwd: repository,
       timeout: 15_000,
       maxBuffer: 8 * 1024 * 1024,

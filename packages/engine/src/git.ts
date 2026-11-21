@@ -1,6 +1,7 @@
 import { execFile, spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import { promisify } from 'node:util'
+import { programPath } from './program.ts'
 
 const execFileAsync = promisify(execFile)
 
@@ -178,7 +179,7 @@ export async function runGit(
   checkCommand(subcommand, args)
   try {
     const { stdout } = await execFileAsync(
-      'git',
+      programPath('git'),
       gitArgs(repoPath, subcommand, args),
       { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, env: GIT_ENV }
     )
@@ -210,10 +211,14 @@ export function forEachGitLine(
 ): Promise<void> {
   checkCommand(subcommand, args)
   return new Promise((resolve, reject) => {
-    const child = spawn('git', gitArgs(repoPath, subcommand, args), {
-      env: GIT_ENV,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
+    const child = spawn(
+      programPath('git'),
+      gitArgs(repoPath, subcommand, args),
+      {
+        env: GIT_ENV,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }
+    )
     let stderr = ''
     child.stderr.setEncoding('utf8')
     child.stderr.on('data', (chunk: string) => {

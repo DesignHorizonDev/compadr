@@ -26,6 +26,7 @@ import {
   markCheckedCommand,
   type DecisionRow,
 } from './decisions.ts'
+import { safeHref } from '../links.ts'
 
 /** The decisions of a report, and the page of the one selected. */
 export function DecisionsView({
@@ -200,7 +201,7 @@ function AttributionText({
   return (
     <>
       {attribution.names.join(', ')} ({labelled ? 'pull request' : pull.role}{' '}
-      <a href={pull.url} rel="noreferrer" title={pull.title}>
+      <a href={safeHref(pull.url)} rel="noreferrer" title={pull.title}>
         #{pull.number}
       </a>
       )

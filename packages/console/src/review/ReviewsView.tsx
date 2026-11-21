@@ -14,6 +14,7 @@ import type {
 import { DraftDecisionCell } from './DraftDecisionCell.tsx'
 import { openPullRequestCommand, reviewCommands } from './commands.ts'
 import { reviewPage, type OverlapReason } from './overlaps.ts'
+import { safeHref } from '../links.ts'
 
 type Loadable<T> =
   | { state: 'loading' }
@@ -144,7 +145,10 @@ export function ReviewsView({
                   </td>
                   <td>
                     {review.pullRequest ? (
-                      <a href={review.pullRequest.url} rel="noreferrer">
+                      <a
+                        href={safeHref(review.pullRequest.url)}
+                        rel="noreferrer"
+                      >
                         #{review.pullRequest.number}
                         {review.pullRequest.draft ? ' (draft)' : ''}
                       </a>
@@ -204,7 +208,7 @@ function ChangesSection({
                 </td>
                 <td>
                   {change.pullRequest ? (
-                    <a href={change.pullRequest.url} rel="noreferrer">
+                    <a href={safeHref(change.pullRequest.url)} rel="noreferrer">
                       #{change.pullRequest.number}
                       {change.pullRequest.draft ? ' (draft)' : ''}
                     </a>
@@ -354,7 +358,7 @@ function ReviewDetail({
       <p className="reading-meta">
         {decision.rawStatus || 'proposed'} ·{' '}
         {pr ? (
-          <a href={pr.url} rel="noreferrer">
+          <a href={safeHref(pr.url)} rel="noreferrer">
             pull request #{pr.number}
           </a>
         ) : (
@@ -496,7 +500,7 @@ function ReviewDetail({
           <>
             <p className="hint">
               The decision is accepted, changed or rejected on{' '}
-              <a href={pr.url} rel="noreferrer">
+              <a href={safeHref(pr.url)} rel="noreferrer">
                 pull request #{pr.number}
               </a>
               . The merge of the pull request sets the date of acceptance.

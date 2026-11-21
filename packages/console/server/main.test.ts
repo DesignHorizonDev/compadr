@@ -1,5 +1,11 @@
 // @vitest-environment node
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { request, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -67,6 +73,32 @@ function statusWithHost(url: string, host: string): Promise<number> {
     })
       .on('error', fail)
       .end()
+  })
+}
+
+/** A request with headers that fetch cannot set, and its answer. */
+function send(
+  url: string,
+  options: { method?: string; headers?: Record<string, string>; body?: string }
+): Promise<{ status: number; headers: Record<string, unknown>; body: string }> {
+  return new Promise((done, fail) => {
+    const sent = request(
+      url,
+      { method: options.method ?? 'GET', headers: options.headers },
+      response => {
+        const chunks: Buffer[] = []
+        response.on('data', (chunk: Buffer) => chunks.push(chunk))
+        response.on('end', () =>
+          done({
+            status: response.statusCode ?? 0,
+            headers: response.headers,
+            body: Buffer.concat(chunks).toString('utf8'),
+          })
+        )
+      }
+    )
+    sent.on('error', fail)
+    sent.end(options.body)
   })
 }
 
@@ -223,6 +255,124 @@ describe('compadr-console', () => {
     )
     expect(result).toBe(2)
     expect(err[0]).toBe('compadr-console: --port http is not a port number')
+  })
+})
+
+describe('compadr-console, against another site and the network', () => {
+  it('refuses the API to a request of another site, and keeps no answer', async () => {
+    const { result } = await start([fixture.path, '--no-cache'])
+    if (typeof result === 'number') throw new Error(`exit ${result}`)
+    const url = `${base(result)}/api/reports`
+    const crossSite: Record<string, string>[] = [
+      { 'sec-fetch-site': 'cross-site' },
+      { 'sec-fetch-site': 'same-site' },
+      { origin: 'http://evil.test' },
+    ]
+    for (const headers of crossSite) {
+      expect((await send(url, { headers })).status).toBe(403)
+    }
+    const own = await send(url, {
+      headers: { 'sec-fetch-site': 'same-origin' },
+    })
+    expect(own.status).toBe(200)
+    expect(own.headers['cache-control']).toBe('no-store')
+    // An address typed by hand, or a program, has no such header.
+    expect((await send(url, {})).status).toBe(200)
+  })
+
+  it('answers 413 to a body larger than the limit', async () => {
+    const { result } = await start([fixture.path, '--cache-dir', cacheDir])
+    if (typeof result === 'number') throw new Error(`exit ${result}`)
+    const [id] = repositoryIds([fixture.path])
+    const answer = await send(`${base(result)}/api/drafts/${id}/checks`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: base(result),
+        host: base(result).slice('http://'.length),
+      },
+      body: JSON.stringify({ references: ['x'.repeat(70 * 1024)] }),
+    })
+    expect(answer.status).toBe(413)
+  })
+
+  it('asks for the token of the printed address when it listens on the network', async () => {
+    const { result, out, err } = await start([
+      fixture.path,
+      '--no-cache',
+      '--host',
+      '0.0.0.0',
+    ])
+    if (typeof result === 'number') throw new Error(`exit ${result}`)
+    expect(err).toContain(
+      'needs the token of the printed address to read the repositories'
+    )
+    const token = /\/\?token=([\w-]+) serves/.exec(out)?.[1]
+    expect(token).toMatch(/^[\w-]{32}$/)
+    const url = base(result)
+    expect((await send(`${url}/api/reports`, {})).status).toBe(401)
+    expect((await send(`${url}/?token=wrong`, {})).status).toBe(401)
+    const opened = await send(`${url}/reports?token=${token}`, {})
+    expect(opened.status).toBe(303)
+    expect(opened.headers.location).toBe('/reports')
+    const cookie = String(opened.headers['set-cookie']).split(';')[0]!
+    // The cookie names the port: two consoles of one machine keep their token.
+    expect(
+      cookie.startsWith(`compadr-console-token-${new URL(url).port}=`)
+    ).toBe(true)
+    expect(String(opened.headers['set-cookie'])).toContain(
+      'HttpOnly; SameSite=Strict'
+    )
+    // Another cookie of the same name does not hide the right one.
+    const stale = `${cookie.split('=')[0]}=old; ${cookie}`
+    expect(
+      (await send(`${url}/api/reports`, { headers: { cookie: stale } })).status
+    ).toBe(200)
+    expect(
+      (await send(`${url}/api/reports`, { headers: { cookie } })).status
+    ).toBe(200)
+  })
+
+  it('needs no token on this machine', async () => {
+    const { result, out } = await start([fixture.path, '--no-cache'])
+    if (typeof result === 'number') throw new Error(`exit ${result}`)
+    expect(out).not.toContain('token=')
+    expect((await send(`${base(result)}/api/reports`, {})).status).toBe(200)
+  })
+
+  it('stops with a message when it cannot listen on the address', async () => {
+    for (const [host, call] of [
+      ['192.0.2.1', 'listen'],
+      ['no-such-host.invalid', 'getaddrinfo'],
+    ] as const) {
+      const { result, err } = await start([
+        fixture.path,
+        '--no-cache',
+        '--host',
+        host,
+      ])
+      expect(result).toBe(1)
+      expect(err).toContain(`compadr-console: ${call}`)
+    }
+  })
+
+  it('keeps its cache folder to its own account', async () => {
+    const xdg = mkdtempSync(join(tmpdir(), 'compadr-xdg-'))
+    const before = {
+      xdg: process.env.XDG_CACHE_HOME,
+      mask: process.umask(0o022),
+    }
+    process.env.XDG_CACHE_HOME = xdg
+    try {
+      const { result } = await start([fixture.path])
+      if (typeof result === 'number') throw new Error(`exit ${result}`)
+      expect(statSync(join(xdg, 'compadr')).mode & 0o777).toBe(0o700)
+    } finally {
+      process.umask(before.mask)
+      if (before.xdg === undefined) delete process.env.XDG_CACHE_HOME
+      else process.env.XDG_CACHE_HOME = before.xdg
+      rmSync(xdg, { recursive: true, force: true })
+    }
   })
 })
 
