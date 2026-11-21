@@ -189,20 +189,27 @@ export async function commitFiles(
     (await run('git', args, clone, env)).trim()
   try {
     await git('read-tree', request.parent)
-    let count = 0
-    for (const [path, content] of request.files) {
-      const file = join(work, `blob-${count++}`)
+    const modes = await treeModes(run, clone, request.parent, [
+      ...request.files.keys(),
+    ])
+    // One hash-object and one update-index for all the files.
+    const entries = [...request.files]
+    const blobFiles = entries.map(([, content], i) => {
+      const file = join(work, `blob-${i}`)
       writeFileSync(file, content)
-      const blob = await git('hash-object', '-w', '--no-filters', '--', file)
-      // Without --replace, a path under an entry that is a file or a link,
-      // such as a linked folder, is refused.
-      await git(
-        'update-index',
-        '--add',
+      return file
+    })
+    const blobs = (
+      await git('hash-object', '-w', '--no-filters', '--', ...blobFiles)
+    ).split('\n')
+    await git(
+      'update-index',
+      '--add',
+      ...entries.flatMap(([path], i) => [
         '--cacheinfo',
-        `100644,${blob},${path}`
-      )
-    }
+        `${fileMode(path, modes)},${blobs[i]},${path}`,
+      ])
+    )
     const tree = await git('write-tree')
     return await git(
       ...request.identity,
@@ -218,6 +225,64 @@ export async function commitFiles(
   } finally {
     rmSync(work, { recursive: true, force: true })
   }
+}
+
+/**
+ * The mode of each path of `paths` and of each of their folders in the tree
+ * of `commit`, for the paths that the tree holds.
+ */
+async function treeModes(
+  run: CommandRunner,
+  clone: string,
+  commit: string,
+  paths: readonly string[]
+): Promise<Map<string, string>> {
+  const wanted = new Set<string>()
+  for (const path of paths) {
+    const parts = path.split('/')
+    for (let i = 1; i <= parts.length; i++) {
+      wanted.add(parts.slice(0, i).join('/'))
+    }
+  }
+  const output = await run(
+    'git',
+    ['--literal-pathspecs', 'ls-tree', '-z', commit, '--', ...wanted],
+    clone
+  )
+  const modes = new Map<string, string>()
+  for (const entry of output.split('\0')) {
+    // `<mode> <type> <object>\t<path>`
+    const tab = entry.indexOf('\t')
+    if (tab < 0) continue
+    const path = entry.slice(tab + 1)
+    if (wanted.has(path)) modes.set(path, entry.slice(0, entry.indexOf(' ')))
+  }
+  return modes
+}
+
+/**
+ * The mode of a file of a correction. An executable file stays executable,
+ * and a link becomes a regular file. A path under an entry of the tree that
+ * is not a folder, such as a folder versioned as a link, is refused.
+ */
+function fileMode(path: string, modes: ReadonlyMap<string, string>): string {
+  const parts = path.split('/')
+  for (let i = 1; i < parts.length; i++) {
+    const folder = parts.slice(0, i).join('/')
+    const mode = modes.get(folder)
+    if (mode !== undefined && mode !== '040000') {
+      throw new PublishError(
+        `${path} cannot be written: ${folder} is not a folder in the repository`
+      )
+    }
+  }
+  const mode = modes.get(path)
+  if (mode === '040000' || mode === '160000') {
+    throw new PublishError(
+      `${path} cannot be written: it is a folder in the repository`
+    )
+  }
+  return mode === '100755' ? '100755' : '100644'
 }
 
 /** `git show` of a commit, without the diff programs of any configuration. */

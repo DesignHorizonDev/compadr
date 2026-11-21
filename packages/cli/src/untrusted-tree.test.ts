@@ -10,7 +10,12 @@ import { join } from 'node:path'
 import { createFixtureRepo, type FixtureRepo } from '@compadr/engine/testing'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { main } from './main.ts'
-import { checkCorrectionPath, PublishError } from './publish.ts'
+import {
+  checkCorrectionPath,
+  commitFiles,
+  PublishError,
+  runCommand,
+} from './publish.ts'
 
 // The tree of an analysed commit comes from whoever wrote it. A link of that
 // tree must not lead a correction to write outside its clone.
@@ -97,6 +102,73 @@ describe('a correction on a tree that holds links', () => {
       expect(result.code).toBe(0)
     }
     expectNothingOutside()
+  })
+})
+
+describe('commitFiles', () => {
+  let tree: FixtureRepo
+  let parent: string
+
+  beforeAll(() => {
+    tree = createFixtureRepo([
+      {
+        date: '2026-01-10T09:00:00Z',
+        files: { 'tools/run.sh': '#!/bin/sh\n', 'real/a.md': 'a\n' },
+      },
+    ])
+    tree.git('update-index', '--chmod=+x', 'tools/run.sh')
+    // A folder versioned as a link.
+    symlinkSync('real', join(tree.path, 'linked'))
+    tree.git('add', '--', 'linked')
+    tree.git(
+      '-c',
+      'user.name=Compadr',
+      '-c',
+      'user.email=fixture@example.com',
+      'commit',
+      '-q',
+      '-m',
+      'Add an executable and a linked folder'
+    )
+    parent = tree.git('rev-parse', 'HEAD').trim()
+  })
+
+  afterAll(() => tree.remove())
+
+  const commit = (files: Record<string, string>) =>
+    commitFiles(runCommand, tree.path, {
+      parent,
+      files: new Map(Object.entries(files)),
+      identity: [
+        '-c',
+        'user.name=Compadr',
+        '-c',
+        'user.email=fixture@example.com',
+      ],
+      title: 'Correction',
+      body: 'Body',
+    })
+
+  it('keeps an executable file executable', async () => {
+    const created = await commit({ 'tools/run.sh': '#!/bin/sh\necho\n' })
+    expect(tree.git('ls-tree', created, '--', 'tools/run.sh')).toMatch(
+      /^100755 /
+    )
+  })
+
+  it('writes several files in one commit', async () => {
+    const created = await commit({ 'one.md': '1\n', 'real/two.md': '2\n' })
+    expect(tree.git('show', `${created}:one.md`)).toBe('1\n')
+    expect(tree.git('show', `${created}:real/two.md`)).toBe('2\n')
+  })
+
+  it('refuses a path under a folder versioned as a link', async () => {
+    await expect(commit({ 'linked/INDEX.md': 'x\n' })).rejects.toThrow(
+      new PublishError(
+        'linked/INDEX.md cannot be written: linked is not a folder in the repository'
+      )
+    )
+    await expect(commit({ real: 'x\n' })).rejects.toThrow(PublishError)
   })
 })
 
