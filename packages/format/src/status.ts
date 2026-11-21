@@ -10,13 +10,22 @@ export const DECISION_STATUSES = [
 export type DecisionStatus = (typeof DECISION_STATUSES)[number]
 
 // Keywords of each status, in English and in French. Log4brains `draft` counts
-// as proposed.
+// as proposed, and so does a decision that waits for a review ("Pending
+// review", "To be decided"). "Decided", "Approved" and "Merged" (the pull
+// request of the record) count as accepted. A keyword starts a word:
+// "Undecided" and "Unapproved" give no status.
 const STATUS_KEYWORDS: readonly [DecisionStatus, RegExp][] = [
   ['superseded', /supersed|remplac[ée]+ par/g],
   ['deprecated', /deprecat|obsol[eè]te/g],
   ['rejected', /reject|rejet/g],
-  ['proposed', /propos|draft|brouillon/g],
-  ['accepted', /accept/g],
+  [
+    'proposed',
+    /propos|draft|brouillon|(?<![a-z])pending|en attente|to be decided|[àa] d[ée]cider/g,
+  ],
+  [
+    'accepted',
+    /accept|(?<![a-z])(?:decided|d[ée]cid[ée]e?s?|approved|approuv[ée]e?s?|merged)(?![a-z])/g,
+  ],
 ]
 
 // A keyword right after a negation does not give the status: "not accepted",
