@@ -613,3 +613,39 @@ describe('accept requests', () => {
     ])
   })
 })
+
+describe('amendmentChain', () => {
+  const reportOf = (
+    decisions: { number: number; amends?: number[]; amendedBy?: number[] }[]
+  ) =>
+    ({
+      decisions: decisions.map(d => ({
+        amends: [],
+        amendedBy: [],
+        supersededBy: [],
+        ...d,
+      })),
+    }) as unknown as DriftReport
+
+  it('follows a newer decision that only the older record names', () => {
+    // 0008 says "Amended by ADR-0034"; 0034 does not name 0008.
+    const report = reportOf([
+      { number: 3 },
+      { number: 8, amends: [3], amendedBy: [34] },
+      { number: 34 },
+      { number: 40, amends: [34] },
+    ])
+    expect(amendmentChain(report, 8)).toEqual([3, 8, 34, 40])
+    expect(amendmentChain(report, 34)).toEqual([3, 8, 34, 40])
+  })
+
+  it('keeps a sibling out, whichever record declares the link', () => {
+    const report = reportOf([
+      { number: 2, amendedBy: [3, 5] },
+      { number: 3 },
+      { number: 5 },
+    ])
+    expect(amendmentChain(report, 2)).toEqual([2, 3, 5])
+    expect(amendmentChain(report, 3)).toEqual([2, 3])
+  })
+})

@@ -39,6 +39,22 @@ const hostile: [string, () => unknown][] = [
     () => parseAdr('0001-a.md', `# T\n\n## ${' '.repeat(N)}x\n`),
   ],
   [
+    'a long list of decisions after one prefix',
+    () =>
+      parseAdr(
+        '0001-a.md',
+        `# T\n\nAmends ADR 0002${', 0003'.repeat(N / 6)}\n`
+      ),
+  ],
+  [
+    'prefixes followed by runs of spaces',
+    () =>
+      parseAdr(
+        '0001-a.md',
+        `# T\n\n${`ADR 2${' '.repeat(N / 100)}`.repeat(100)}\n`
+      ),
+  ],
+  [
     'a status of repeated negations',
     () => normalizeStatus('not accept '.repeat(N / 10)),
   ],
