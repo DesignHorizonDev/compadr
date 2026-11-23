@@ -137,6 +137,27 @@ function serviceUrl(address: string): string {
 }
 
 /**
+ * The token of the service, checked before it goes into a header. fetch
+ * refuses a header value with a line break, and quotes the whole value in
+ * its error: a token pasted on two lines would then reach the output and a
+ * comment of a pull request. The error here never quotes the token.
+ */
+function serviceToken(token: string): string {
+  const value = token.trim()
+  if (value === '') {
+    throw new AssistServiceError(
+      'the token of the assist service is empty: set COMPADR_ASSIST_TOKEN'
+    )
+  }
+  if (!/^[\x21-\x7e]+$/.test(value)) {
+    throw new AssistServiceError(
+      'the token of the assist service holds a space, a line break or a character outside ASCII: set COMPADR_ASSIST_TOKEN again, on one line'
+    )
+  }
+  return value
+}
+
+/**
  * A client that posts each request to `<url>/v1/assist/<kind>` as JSON and
  * reads the suggestion against its schema. A suggestion of another kind than
  * the request is an error.
@@ -149,6 +170,7 @@ export function httpAssistClient(
   const timeoutMs = options.timeoutMs ?? 120_000
   return {
     async suggest(request) {
+      const token = serviceToken(options.token)
       let response: Response
       try {
         response = await send(`${url}/v1/assist/${request.kind}`, {
@@ -156,9 +178,12 @@ export function httpAssistClient(
           headers: {
             'content-type': 'application/json',
             accept: 'application/json',
-            authorization: `Bearer ${options.token}`,
+            authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(request),
+          // A redirect would carry the change and the decisions to another
+          // address: the service answers at its own address or not at all.
+          redirect: 'error',
           signal: AbortSignal.timeout(timeoutMs),
         })
       } catch (error) {
@@ -288,14 +313,16 @@ export function httpAssistUsage(
   const send = options.fetch ?? globalThis.fetch
   const timeoutMs = options.timeoutMs ?? 30_000
   async function call(path: string, init: RequestInit): Promise<AssistUsage> {
+    const token = serviceToken(options.token)
     let response: Response
     let body: string
     try {
       response = await send(`${url}${path}`, {
         ...init,
+        redirect: 'error',
         headers: {
           accept: 'application/json',
-          authorization: `Bearer ${options.token}`,
+          authorization: `Bearer ${token}`,
           ...(init.body === undefined
             ? {}
             : { 'content-type': 'application/json' }),

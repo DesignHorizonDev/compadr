@@ -136,6 +136,85 @@ describe('httpAssistClient', () => {
   })
 })
 
+describe('httpAssistClient, before a request leaves', () => {
+  it('refuses a token on two lines without quoting it, and sends nothing', async () => {
+    const seen: Request[] = []
+    for (const token of [
+      'tok-AAAA\ntok-BBBB',
+      'tok-CCCC tok-DDDD',
+      'tok-é-EEEE',
+    ]) {
+      const error = await httpAssistClient({
+        url: 'https://assist.test',
+        token,
+        fetch: fetchAnswering(200, '{}', seen),
+      })
+        .suggest(request)
+        .then(
+          () => new Error('no error'),
+          (caught: unknown) => caught as Error
+        )
+      expect(error).toBeInstanceOf(AssistServiceError)
+      expect(error.message).toContain(
+        'set COMPADR_ASSIST_TOKEN again, on one line'
+      )
+      expect(error.message).not.toContain('tok-')
+    }
+    await expect(
+      httpAssistUsage({
+        url: 'https://assist.test',
+        token: 'tok-AAAA\ntok-BBBB',
+        fetch: fetchAnswering(200, '{}', seen),
+      }).usage()
+    ).rejects.toBeInstanceOf(AssistServiceError)
+    expect(seen).toHaveLength(0)
+  })
+
+  it('names an empty token as empty', async () => {
+    for (const token of ['', '  \n']) {
+      await expect(
+        httpAssistClient({
+          url: 'https://assist.test',
+          token,
+          fetch: fetchAnswering(200, '{}'),
+        }).suggest(request)
+      ).rejects.toThrow(
+        'the token of the assist service is empty: set COMPADR_ASSIST_TOKEN'
+      )
+    }
+  })
+
+  it('keeps a token with a final line break, as an environment gives it', async () => {
+    const suggestion = await fakeAssistClient().suggest(request)
+    const seen: Request[] = []
+    await httpAssistClient({
+      url: 'https://assist.test',
+      token: 'secret\n',
+      fetch: fetchAnswering(200, JSON.stringify(suggestion), seen),
+    }).suggest(request)
+    expect(seen[0]!.headers.get('authorization')).toBe('Bearer secret')
+  })
+
+  it('refuses to follow a redirect', async () => {
+    const seen: RequestInit[] = []
+    const fetch = ((_: unknown, init?: RequestInit) => {
+      seen.push(init!)
+      return Promise.reject(new TypeError('fetch failed'))
+    }) as typeof globalThis.fetch
+    await expect(
+      httpAssistClient({
+        url: 'https://assist.test',
+        token: 't',
+        fetch,
+      }).suggest(request)
+    ).rejects.toBeInstanceOf(AssistServiceError)
+    await expect(
+      httpAssistUsage({ url: 'https://assist.test', token: 't', fetch }).usage()
+    ).rejects.toBeInstanceOf(AssistServiceError)
+    expect(seen.map(init => init.redirect)).toEqual(['error', 'error'])
+  })
+})
+
 describe('httpAssistClient, on a hostile answer', () => {
   const client = (fetch: typeof globalThis.fetch) =>
     httpAssistClient({ url: 'https://assist.test', token: 't', fetch })

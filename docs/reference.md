@@ -483,7 +483,7 @@ assist:
     - config/secrets
 ```
 
-- The change is the diff of `--diff`, or the commits since `--base`, as the pull request shows them. The files of `assist.exclude` leave the diff before the request is built, so their decisions are not sent either. A setting of `assist` that cannot be read keeps the option off.
+- The change is the diff of `--diff`, or the commits since `--base`, as the pull request shows them. The files of `assist.exclude` leave the diff before the request is built, so their decisions are not sent either. A setting of `assist` that cannot be read keeps the option off. An entry of `assist.exclude` is a path, not a pattern: an entry with `*` or `?` keeps the option off, and `compadr check` names it among the problems of `compadr.yml`. Brackets and braces stay part of the path, as in `app/[id]`.
 - The address of the service comes from `COMPADR_ASSIST_URL` and its token from `COMPADR_ASSIST_TOKEN`. Without the option, an address or a token, the command sends nothing and says why.
 - Each finding that the guard keeps is a notice (`semantic-violated` or `semantic-at-risk`) on the line of the change, with the rule it quotes and the explanation of the model. A notice never fails the check: the exit code stays that of the deterministic check, even when the service fails.
 - When the customer has used the AI credits of its month, up to its cap, the service answers 402 and calls no model. `check --semantic` then says that the semantic check was skipped and why, and keeps the exit code of the deterministic check. With `--comment`, the comment of the pull request says that the check did not run. The console, `compadr assist` and the MCP tools give the same reason.
