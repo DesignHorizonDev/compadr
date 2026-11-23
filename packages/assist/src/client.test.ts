@@ -5,6 +5,7 @@ import {
   AssistCapReachedError,
   AssistServiceError,
   httpAssistClient,
+  httpAssistOutcomes,
   httpAssistUsage,
   MAX_ANSWER_BYTES,
   oneLine,
@@ -322,6 +323,36 @@ describe('httpAssistUsage', () => {
     expect(await seen[1]!.json()).toEqual({ cap: null })
   })
 
+  it('reads the setting of the outcome signal, and sets it', async () => {
+    const seen: Request[] = []
+    const client = httpAssistUsage({
+      url: 'https://assist.test',
+      token: 'secret',
+      fetch: fetchAnswering(
+        200,
+        JSON.stringify({ ...usage, outcomes: false }),
+        seen
+      ),
+    })
+    expect((await client.usage()).outcomes).toBe(false)
+    expect(await client.setOutcomes!(false)).toEqual({
+      ...usage,
+      outcomes: false,
+    })
+    expect([seen[1]!.method, seen[1]!.url]).toEqual([
+      'PUT',
+      'https://assist.test/v1/usage/outcomes',
+    ])
+    expect(await seen[1]!.json()).toEqual({ outcomes: false })
+    // A service that records no outcome gives no setting.
+    const without = httpAssistUsage({
+      url: 'https://assist.test',
+      token: 'secret',
+      fetch: fetchAnswering(200, JSON.stringify(usage)),
+    })
+    expect(await without.usage()).not.toHaveProperty('outcomes')
+  })
+
   it('reports an error of the service and an answer outside the contract', async () => {
     const failing = (status: number, body: string) =>
       httpAssistUsage({
@@ -348,5 +379,57 @@ describe('httpAssistUsage', () => {
     expect(() =>
       httpAssistUsage({ url: 'http://assist.example.com', token: 't' })
     ).toThrow('must start with https://')
+  })
+})
+
+describe('httpAssistOutcomes', () => {
+  const outcome = {
+    inputHash: 'a'.repeat(64),
+    kind: 'draft' as const,
+    outcome: 'followed' as const,
+  }
+
+  it('posts an outcome with the token, and no text of the suggestion', async () => {
+    const seen: Request[] = []
+    await httpAssistOutcomes({
+      url: 'https://assist.test/',
+      token: 'secret',
+      // A 204 carries no body.
+      fetch: (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+        seen.push(new Request(input, init))
+        return Promise.resolve(new Response(null, { status: 204 }))
+      },
+    }).report(outcome)
+    expect([seen[0]!.method, seen[0]!.url]).toEqual([
+      'POST',
+      'https://assist.test/v1/outcome',
+    ])
+    expect(seen[0]!.headers.get('authorization')).toBe('Bearer secret')
+    expect(await seen[0]!.json()).toEqual({ item: '', ...outcome })
+  })
+
+  it('takes a signal turned off and a service without outcomes as nothing to do', async () => {
+    for (const status of [202, 404]) {
+      await expect(
+        httpAssistOutcomes({
+          url: 'https://assist.test',
+          token: 't',
+          fetch: fetchAnswering(status, '{}'),
+        }).report(outcome)
+      ).resolves.toBeUndefined()
+    }
+  })
+
+  it('reports a failure of the service, and refuses an address without TLS', async () => {
+    await expect(
+      httpAssistOutcomes({
+        url: 'https://assist.test',
+        token: 't',
+        fetch: fetchAnswering(500, '{}'),
+      }).report(outcome)
+    ).rejects.toBeInstanceOf(AssistServiceError)
+    expect(() =>
+      httpAssistOutcomes({ url: 'http://assist.test', token: 't' })
+    ).toThrow(AssistServiceError)
   })
 })

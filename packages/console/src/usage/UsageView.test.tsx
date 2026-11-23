@@ -54,6 +54,48 @@ describe('UsageView', () => {
     expect(caps).toEqual([150, null])
   })
 
+  it('offers the outcome signal only when the service records outcomes, and sets it', async () => {
+    const settings: boolean[] = []
+    let current: UsageInfo = { ...USAGE, outcomes: true }
+    const user = userEvent.setup()
+    render(
+      <UsageView
+        portal={fakePortal({
+          usage: () => Promise.resolve(current),
+          setUsageOutcomes: on => {
+            settings.push(on)
+            current = { ...current, outcomes: on }
+            return Promise.resolve(current)
+          },
+        })}
+      />
+    )
+    const box = await screen.findByLabelText<HTMLInputElement>(
+      'Send the outcome of each suggestion'
+    )
+    expect(box.checked).toBe(true)
+    expect(
+      screen.getByText(/holds no code and no text of a record/)
+    ).toBeTruthy()
+    await user.click(box)
+    expect(settings).toEqual([false])
+    expect(
+      (
+        await screen.findByLabelText<HTMLInputElement>(
+          'Send the outcome of each suggestion'
+        )
+      ).checked
+    ).toBe(false)
+    cleanup()
+    render(
+      <UsageView portal={fakePortal({ usage: () => Promise.resolve(USAGE) })} />
+    )
+    await screen.findByText(/November 2026/)
+    expect(
+      screen.queryByLabelText('Send the outcome of each suggestion')
+    ).toBeNull()
+  })
+
   it('announces an overage only for a cap above the included volume', async () => {
     render(
       <UsageView

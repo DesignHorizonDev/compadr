@@ -260,6 +260,11 @@ export interface AssistUsage {
   used: number
   byKind: Record<string, number>
   byRepository: Record<string, number>
+  /**
+   * Whether the service records the outcomes of the suggestions of the
+   * customer. Absent when the service records none.
+   */
+  outcomes?: boolean
 }
 
 /** The use of the month and the cap of a customer, on the assist service. */
@@ -267,6 +272,11 @@ export interface AssistUsageClient {
   usage(): Promise<AssistUsage>
   /** Sets the cap; null goes back to the included volume. */
   setCap(cap: number | null): Promise<AssistUsage>
+  /**
+   * Turns the outcome signal of the customer on or off. A client written
+   * before the signal may leave it out.
+   */
+  setOutcomes?(on: boolean): Promise<AssistUsage>
 }
 
 const isCount = (value: unknown): value is number =>
@@ -298,6 +308,7 @@ function usageOf(value: unknown): AssistUsage | null {
         used: u.used,
         byKind: u.byKind,
         byRepository: u.byRepository,
+        ...(typeof u.outcomes === 'boolean' ? { outcomes: u.outcomes } : {}),
       }
     : null
 }
@@ -361,5 +372,77 @@ export function httpAssistUsage(
     usage: () => call('/v1/usage', { method: 'GET' }),
     setCap: cap =>
       call('/v1/usage/cap', { method: 'PUT', body: JSON.stringify({ cap }) }),
+    setOutcomes: on =>
+      call('/v1/usage/outcomes', {
+        method: 'PUT',
+        body: JSON.stringify({ outcomes: on }),
+      }),
+  }
+}
+
+/**
+ * What a person did with a suggestion: `shown` (a person saw it),
+ * `followed` (a person kept it, such as a draft published) or `dismissed`
+ * (a person set it aside, such as a draft discarded). The outcome names the
+ * suggestion by the hash of its request, and holds none of its text.
+ */
+export interface SuggestionOutcome {
+  /** The hash that the suggestion carries in its provenance. */
+  inputHash: string
+  kind: AssistRequest['kind']
+  /** Empty for the whole suggestion, or a name and a position such as `finding:2`. */
+  item?: string
+  outcome: 'shown' | 'followed' | 'dismissed'
+}
+
+/** Sends the outcomes of the suggestions to the assist service. */
+export interface AssistOutcomeClient {
+  /**
+   * Sends one outcome. It resolves when the service recorded it, when the
+   * administrator turned the signal off, and when the service records no
+   * outcome; it rejects when the service fails.
+   */
+  report(outcome: SuggestionOutcome): Promise<void>
+}
+
+/**
+ * A client of `POST /v1/outcome`, with the token of the customer. The same
+ * rules as the assist client hold for the address. A service that records
+ * no outcome answers 404, which the client takes as nothing to do.
+ */
+export function httpAssistOutcomes(
+  options: HttpAssistClientOptions
+): AssistOutcomeClient {
+  const url = serviceUrl(options.url)
+  const send = options.fetch ?? globalThis.fetch
+  const timeoutMs = options.timeoutMs ?? 10_000
+  return {
+    async report(outcome) {
+      const token = serviceToken(options.token)
+      let response: Response
+      try {
+        response = await send(`${url}/v1/outcome`, {
+          method: 'POST',
+          redirect: 'error',
+          headers: {
+            'content-type': 'application/json',
+            accept: 'application/json',
+            authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ item: '', ...outcome }),
+          signal: AbortSignal.timeout(timeoutMs),
+        })
+        await readBody(response)
+      } catch (error) {
+        throw new AssistServiceError(
+          `the assist service did not answer: ${oneLine((error as Error).message)}`
+        )
+      }
+      if (response.ok || response.status === 404) return
+      throw new AssistServiceError(
+        `the assist service answered ${response.status} to an outcome`,
+        response.status
+      )
+    },
   }
 }

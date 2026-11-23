@@ -5,7 +5,12 @@ import { randomBytes } from 'node:crypto'
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { parseArgs } from 'node:util'
-import type { AssistClient } from '@compadr/assist'
+import {
+  httpAssistOutcomes,
+  type AssistClient,
+  type AssistOutcomeClient,
+  type HttpAssistClientOptions,
+} from '@compadr/assist'
 import { GitCommandFailedError, runGit, type LocateWasm } from '@compadr/engine'
 import packageJson from '../package.json' with { type: 'json' }
 import { consoleServer } from './http.ts'
@@ -34,6 +39,8 @@ export interface ConsoleOptions {
   env?: Readonly<Record<string, string | undefined>>
   /** Builds the client of the assist service; the tests give a fake one. */
   assistClient?: (url: string, token: string) => AssistClient
+  /** Builds the client of the outcomes; the tests give a fake one. */
+  assistOutcomes?: (options: HttpAssistClientOptions) => AssistOutcomeClient
   /** The date of a drafted record; now by default. Tests fix it. */
   now?: () => Date
 }
@@ -308,12 +315,30 @@ export async function runConsole(
       )
     } else if (assistUrl !== '') {
       let plain
+      let outcomes
       try {
+        // The service hears that a person saw a suggestion, by the hash of
+        // its request: the drafts of this console are published by the
+        // command line, so it cannot tell a draft kept from one set aside.
+        // A fake client of the service, in the tests, gets no outcome unless
+        // the test gives a client of the outcomes too.
+        const outcomesOf =
+          options.assistOutcomes ??
+          (options.assistClient === undefined ? httpAssistOutcomes : undefined)
+        outcomes =
+          outcomesOf === undefined
+            ? undefined
+            : {
+                client: outcomesOf({ url: assistUrl, token: assistToken }),
+                warn: (message: string) =>
+                  output.err(`compadr-console: ${message}`),
+              }
         plain = consolePlain({
           url: assistUrl,
           token: assistToken,
           cacheDir,
           client: options.assistClient,
+          outcomes,
         })
       } catch (error) {
         throw new UsageError((error as Error).message)
@@ -340,6 +365,9 @@ export async function runConsole(
           cacheDir,
           client: options.assistClient,
           now: options.now,
+          ...(outcomes === undefined
+            ? {}
+            : { outcomes: { ...outcomes, publications: false } }),
         })
         reports.draftDecision = {
           async cached(id) {

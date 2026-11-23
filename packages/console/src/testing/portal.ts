@@ -21,6 +21,7 @@ export function fakePortal(parts: Partial<PortalSource> = {}): PortalSource {
     startGithubApp: none,
     usage: () => Promise.resolve(null),
     setUsageCap: none,
+    setUsageOutcomes: none,
     invitations: () => Promise.resolve(null),
     invite: none,
     ...parts,

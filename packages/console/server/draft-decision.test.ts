@@ -6,7 +6,9 @@ import {
   AssistServiceError,
   fakeAssistClient,
   type AssistClient,
+  type AssistOutcomeClient,
   type FakeAnswer,
+  type SuggestionOutcome,
 } from '@compadr/assist'
 import { DraftStore } from '@compadr/cli/drafts'
 import { createFixtureRepo, type FixtureRepo } from '@compadr/engine/testing'
@@ -15,9 +17,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { DraftDecisionOutcome } from '../src/assist.ts'
 import type { DraftState } from '../src/drafts.ts'
 import type { ReviewList } from '../src/reviews.ts'
-import { draftNameOf } from './draft-decision.ts'
+import { consoleDraftDecision, draftNameOf } from './draft-decision.ts'
 import { runConsole } from './main.ts'
-import { repositoryIds } from './repository-reports.ts'
+import { repositoryIds, repositoryReports } from './repository-reports.ts'
 
 let fixture: FixtureRepo
 let pages: string
@@ -109,6 +111,7 @@ async function start(
     args?: string[]
   } = {}
 ) {
+  const outcomes: SuggestionOutcome[] = []
   const cacheDir =
     options.cacheDir ?? mkdtempSync(join(tmpdir(), 'compadr-cache-'))
   folders.push(cacheDir)
@@ -130,6 +133,12 @@ async function start(
       pages,
       env: options.env ?? ASSIST,
       now: () => new Date(2026, 10, 19, 10),
+      assistOutcomes: (): AssistOutcomeClient => ({
+        report(outcome) {
+          outcomes.push(outcome)
+          return Promise.resolve()
+        },
+      }),
       assistClient: (): AssistClient => {
         const fake = fakeAssistClient({
           answer: options.answer ?? receipt,
@@ -173,6 +182,7 @@ async function start(
     )}/draft`
   return {
     sent,
+    outcomes,
     cacheDir,
     ask,
     post,
@@ -329,6 +339,90 @@ describe('the drafting of a decision from the change of a branch', () => {
       await lost.close()
       await discard(first.cacheDir, 'propose-feat-receipts')
     }
+  })
+
+  it('tells the service that a draft was shown, and never that the console set it aside', async () => {
+    const console = await start()
+    const route = await console.route('feat/receipts')
+    try {
+      expect((await console.post(route)).status).toBe(200)
+      await new Promise(done => setTimeout(done, 0))
+      expect(console.sent[0]!.kind).toBe('draft')
+      expect(console.outcomes).toHaveLength(1)
+      expect(console.outcomes[0]).toMatchObject({
+        kind: 'draft',
+        outcome: 'shown',
+      })
+      expect(console.outcomes[0]!.inputHash).toMatch(/^[0-9a-f]{64}$/)
+      // The command line publishes the drafts of a console: a draft gone
+      // may have been published first, so no outcome goes.
+      await discard(console.cacheDir, 'propose-feat-receipts')
+      expect((await console.ask(route)).status).toBe(404)
+      expect(console.outcomes).toHaveLength(1)
+    } finally {
+      await console.close()
+    }
+  })
+
+  it('tells a server that publishes its drafts what became of each one', async () => {
+    const cacheDir = mkdtempSync(join(tmpdir(), 'compadr-cache-'))
+    folders.push(cacheDir)
+    const reports = repositoryReports(
+      [
+        {
+          repository: fixture.path,
+          ref: 'main',
+          generatorVersion: '0.0.0',
+          cacheDir,
+        },
+      ],
+      { drafts: { name: 'review', cacheDir } }
+    )
+    const told: SuggestionOutcome['outcome'][] = []
+    const drafting = consoleDraftDecision({
+      url: 'https://assist.test',
+      token: 't',
+      drafts: reports.drafts!,
+      cacheDir,
+      client: () =>
+        fakeAssistClient({
+          answer: receipt,
+          now: () => new Date('2026-11-19T10:00:00Z'),
+        }),
+      now: () => new Date(2026, 10, 19, 10),
+      outcomes: {
+        client: {
+          report(outcome) {
+            told.push(outcome.outcome)
+            return Promise.resolve()
+          },
+        },
+        publications: true,
+      },
+    })
+    const sourceOf = async () => {
+      const { changes } = await reports.reviews()
+      const change = changes.find(c => c.branch === 'feat/receipts')!
+      return (await reports.branchSource(change.reportId))!
+    }
+    // A draft published, then discarded: followed once, never dismissed.
+    const first = await drafting.draft(await sourceOf())
+    await new Promise(done => setTimeout(done, 0))
+    expect(first.result.kind).toBe('drafted')
+    const reportId = (first.result as { reportId: string }).reportId
+    await drafting.published(reportId)
+    await drafting.published(reportId)
+    expect(told).toEqual(['shown', 'followed'])
+    await discard(cacheDir, 'propose-feat-receipts')
+    expect(await drafting.cached(await sourceOf())).toBeUndefined()
+    expect(told).toEqual(['shown', 'followed'])
+    // A draft discarded without a publication: dismissed.
+    await drafting.draft(await sourceOf())
+    await new Promise(done => setTimeout(done, 0))
+    await discard(cacheDir, 'propose-feat-receipts')
+    expect(await drafting.cached(await sourceOf())).toBeUndefined()
+    expect(told).toEqual(['shown', 'followed', 'shown', 'dismissed'])
+    expectRepositoryUnchanged()
   })
 
   it('never sends a change whose files stay in the repository', async () => {

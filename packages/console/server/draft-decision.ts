@@ -6,8 +6,22 @@
 // reviews the record with the code. The server keeps the outcome for the
 // commit of the branch, so that a second click does not pay again. The files
 // that `assist.exclude` of compadr.yml names never leave the machine.
+//
+// With an outcome client, the server tells the service what became of each
+// draft, by the hash of its request and without its text: `shown` when the
+// service answers. A server that publishes the drafts itself (`publications`)
+// also sends `followed` when a person publishes the draft, and `dismissed`
+// when the draft disappears without a publication. A console whose drafts
+// are published by the command line sends `shown` only: it cannot tell a
+// draft published and then discarded from a draft set aside.
 import { createHash } from 'node:crypto'
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs'
 import { join } from 'node:path'
 import {
   AssistServiceError,
@@ -15,6 +29,8 @@ import {
   runAssist,
   withoutExcluded,
   type AssistClient,
+  type SuggestionOutcome,
+  type AssistOutcomeClient,
 } from '@compadr/assist'
 import { buildProposeCorrection, checkDraftName } from '@compadr/cli/drafts'
 import {
@@ -56,6 +72,17 @@ export interface DraftDecisionOptions {
   client?: (url: string, token: string) => AssistClient
   /** The date of the record; now by default. Tests fix it. */
   now?: () => Date
+  /** Sends the outcomes of the drafts to the service; none without it. */
+  outcomes?: {
+    client: AssistOutcomeClient
+    /**
+     * Whether this server publishes the drafts itself, through
+     * `published`: it then sends `followed` and `dismissed` too.
+     */
+    publications: boolean
+    /** Receives a failure to send an outcome; the draft goes on. */
+    warn?: (message: string) => void
+  }
 }
 
 export interface ConsoleDraftDecision {
@@ -63,6 +90,12 @@ export interface ConsoleDraftDecision {
   cached(source: BranchSource): Promise<DraftDecisionOutcome | undefined>
   /** The outcome kept, or a new draft from the service. */
   draft(source: BranchSource, actor?: DraftActor): Promise<DraftDecisionOutcome>
+  /**
+   * A person published a draft: when the service drafted its record, the
+   * outcome `followed` goes to the service. `draftReportId` is the report of
+   * the draft (`DraftState.reportId`).
+   */
+  published(draftReportId: string): Promise<void>
 }
 
 /** The name of the draft of a branch: `propose-` and the branch name. */
@@ -130,6 +163,24 @@ export function consoleDraftDecision(
       ? undefined
       : join(options.cacheDir, 'draft-decision')
   const kept = new Map<string, DraftDecisionOutcome>()
+  const outcomes = options.outcomes
+
+  /** Sends an outcome without waiting: a failure never stops the draft. */
+  function tell(
+    found: DraftDecisionOutcome,
+    outcome: SuggestionOutcome['outcome']
+  ): Promise<void> {
+    if (outcomes === undefined || found.inputHash === undefined) {
+      return Promise.resolve()
+    }
+    return outcomes.client
+      .report({ inputHash: found.inputHash, kind: 'draft', outcome })
+      .catch((error: unknown) =>
+        outcomes.warn?.(
+          `the outcome ${outcome} of a draft did not reach the assist service: ${(error as Error).message}`
+        )
+      )
+  }
   // A second click while the first waits does not pay twice.
   const pending = new Map<string, Promise<DraftDecisionOutcome>>()
 
@@ -156,6 +207,26 @@ export function consoleDraftDecision(
     } catch {
       // The outcome stays in memory.
     }
+  }
+
+  /** Every outcome kept, in memory and on disk. */
+  function allKept(): [string, DraftDecisionOutcome][] {
+    const all = new Map(kept)
+    if (folder !== undefined) {
+      let names: string[] = []
+      try {
+        names = readdirSync(folder)
+      } catch {
+        // No folder yet: nothing kept on disk.
+      }
+      for (const name of names) {
+        const key = name.replace(/\.json$/, '')
+        if (key === name || all.has(key)) continue
+        const found = fromDisk(key)
+        if (found !== undefined) all.set(key, found)
+      }
+    }
+    return [...all]
   }
 
   function forget(key: string) {
@@ -185,6 +256,10 @@ export function consoleDraftDecision(
       )
       if (state?.reportId == null) {
         forget(key)
+        // Gone without a publication through this server: set aside.
+        if (outcomes?.publications && found.followed !== true) {
+          await tell(found, 'dismissed')
+        }
         return undefined
       }
     }
@@ -260,6 +335,7 @@ export function consoleDraftDecision(
     const common = {
       model: suggestion.provenance.model,
       promptVersion: suggestion.provenance.promptVersion,
+      inputHash: suggestion.provenance.inputHash,
       createdAt: suggestion.provenance.createdAt,
       commit: source.commit,
       excluded: change.excluded,
@@ -342,6 +418,8 @@ export function consoleDraftDecision(
       if (waiting === undefined) {
         waiting = ask(source, actor).then(outcome => {
           keep(key, outcome)
+          // The person sees the draft now; the answer does not wait.
+          void tell(outcome, 'shown')
           return outcome
         })
         pending.set(key, waiting)
@@ -351,6 +429,22 @@ export function consoleDraftDecision(
         )
       }
       return waiting
+    },
+
+    async published(draftReportId) {
+      if (!outcomes?.publications) return
+      for (const [key, found] of allKept()) {
+        if (
+          found.result.kind !== 'drafted' ||
+          found.result.reportId !== draftReportId ||
+          found.followed === true
+        ) {
+          continue
+        }
+        const followed = { ...found, followed: true }
+        keep(key, followed)
+        await tell(followed, 'followed')
+      }
     },
   }
 }
