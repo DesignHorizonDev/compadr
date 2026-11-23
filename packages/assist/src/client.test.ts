@@ -143,7 +143,6 @@ describe('httpAssistClient, before a request leaves', () => {
       'tok-AAAA\ntok-BBBB',
       'tok-CCCC tok-DDDD',
       'tok-é-EEEE',
-      '',
     ]) {
       const error = await httpAssistClient({
         url: 'https://assist.test',
@@ -169,6 +168,20 @@ describe('httpAssistClient, before a request leaves', () => {
       }).usage()
     ).rejects.toBeInstanceOf(AssistServiceError)
     expect(seen).toHaveLength(0)
+  })
+
+  it('names an empty token as empty', async () => {
+    for (const token of ['', '  \n']) {
+      await expect(
+        httpAssistClient({
+          url: 'https://assist.test',
+          token,
+          fetch: fetchAnswering(200, '{}'),
+        }).suggest(request)
+      ).rejects.toThrow(
+        'the token of the assist service is empty: set COMPADR_ASSIST_TOKEN'
+      )
+    }
   })
 
   it('keeps a token with a final line break, as an environment gives it', async () => {

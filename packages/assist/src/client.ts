@@ -144,6 +144,11 @@ function serviceUrl(address: string): string {
  */
 function serviceToken(token: string): string {
   const value = token.trim()
+  if (value === '') {
+    throw new AssistServiceError(
+      'the token of the assist service is empty: set COMPADR_ASSIST_TOKEN'
+    )
+  }
   if (!/^[\x21-\x7e]+$/.test(value)) {
     throw new AssistServiceError(
       'the token of the assist service holds a space, a line break or a character outside ASCII: set COMPADR_ASSIST_TOKEN again, on one line'

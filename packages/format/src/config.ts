@@ -93,8 +93,9 @@ function readAssist(assist: unknown, config: CompadrConfig): void {
     }
     // An entry is a path or the start of a path. A pattern such as
     // `src/*.ts` would match no file and keep nothing out: it turns the
-    // semantic check off instead.
-    const pattern = (exclude as string[]).find(path => /[*?[\]{}]/.test(path))
+    // semantic check off instead. Brackets and braces stay literal, since
+    // web frameworks name folders `[id]` or `{id}`.
+    const pattern = (exclude as string[]).find(path => /[*?]/.test(path))
     if (pattern !== undefined) {
       config.problems.push(
         `${COMPADR_CONFIG}: assist.exclude holds the pattern ${JSON.stringify(pattern)}, but it lists paths and folders, not patterns, so the semantic check stays off`

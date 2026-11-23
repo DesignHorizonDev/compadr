@@ -134,10 +134,20 @@ jobs:
       - name: npm
         run: npm install --global "npm@$NPM_VERSION"
 
+      # npm refuses even a dry run of a version already on npm. A pull
+      # request that changes this file builds the version of main, which is
+      # often published: its archives are then built and checked, and the
+      # dry run says that it skips them.
       - name: Dry run of each package
         run: |
           for name in $PACKAGES; do
-            npm publish ./packs/compadr-$name-*.tgz --access public --dry-run
+            archive=$(ls ./packs/compadr-$name-*.tgz)
+            version=$(tar -xzOf "$archive" package/package.json | node -p "JSON.parse(require('fs').readFileSync(0)).version")
+            if npm view "@compadr/$name@$version" version >/dev/null 2>&1; then
+              echo "@compadr/$name@$version is already on npm: no dry run"
+              continue
+            fi
+            npm publish "$archive" --access public --dry-run
           done
 
   publish:
