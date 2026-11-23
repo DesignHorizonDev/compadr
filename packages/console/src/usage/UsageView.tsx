@@ -229,12 +229,13 @@ function OutcomeSignal({
         Send the outcome of each suggestion
       </label>
       <p className="hint">
-        Compadr tells the assist service whether a person saw a suggestion,
-        published a drafted record or discarded it. The outcome names the
-        suggestion by the hash of its request, and holds no code and no text of
-        a record. The service uses these outcomes to measure the quality of each
-        version. When an administrator turns the signal off, the service deletes
-        the outcomes that it recorded for this account.
+        Compadr tells the assist service whether a person saw a suggestion.
+        Where the server publishes the drafts itself, Compadr also tells whether
+        a person published a drafted record or discarded it. The outcome names
+        the suggestion by the hash of its request, and holds no code and no text
+        of a record. The service uses these outcomes to measure the quality of
+        each version. When an administrator turns the signal off, the service
+        deletes the outcomes that it recorded for this account.
       </p>
     </div>
   )

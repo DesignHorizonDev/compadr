@@ -257,8 +257,9 @@ export function consoleDraftDecision(
       if (state?.reportId == null) {
         forget(key)
         // Gone without a publication through this server: set aside.
+        // The page does not wait for the service.
         if (outcomes?.publications && found.followed !== true) {
-          await tell(found, 'dismissed')
+          void tell(found, 'dismissed')
         }
         return undefined
       }
