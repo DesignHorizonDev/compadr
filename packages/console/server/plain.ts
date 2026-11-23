@@ -12,6 +12,7 @@ import {
   httpAssistClient,
   runAssist,
   type AssistClient,
+  type AssistOutcomeClient,
 } from '@compadr/assist'
 import { buildPlainRequest, type ReadRecord } from '@compadr/engine'
 import {
@@ -41,6 +42,14 @@ export interface PlainOptions {
   cacheDir?: string
   /** Builds the client; the tests give a fake one. */
   client?: (url: string, token: string) => AssistClient
+  /**
+   * Tells the service that a person saw a new version, by the hash of its
+   * request and without its text; nothing is sent without it.
+   */
+  outcomes?: {
+    client: AssistOutcomeClient
+    warn?: (message: string) => void
+  }
 }
 
 /** Where a report reads its records. */
@@ -173,6 +182,21 @@ export function consolePlain(options: PlainOptions): ConsolePlain {
             )
           }
           keep(key, suggestion)
+          // The person reads it now; the answer does not wait.
+          const outcomes = options.outcomes
+          if (outcomes !== undefined) {
+            void outcomes.client
+              .report({
+                inputHash: suggestion.provenance.inputHash,
+                kind: 'plain',
+                outcome: 'shown',
+              })
+              .catch((error: unknown) =>
+                outcomes.warn?.(
+                  `the outcome shown of a plain version did not reach the assist service: ${(error as Error).message}`
+                )
+              )
+          }
           return suggestion
         })()
         pending.set(key, waiting)

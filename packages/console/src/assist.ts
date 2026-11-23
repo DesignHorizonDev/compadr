@@ -35,6 +35,13 @@ export interface AssistAvailability {
 export interface DraftDecisionOutcome {
   model: string
   promptVersion: string
+  /**
+   * The hash of the request, which the suggestion carries: it names the
+   * suggestion in an outcome. Absent from an outcome kept before.
+   */
+  inputHash?: string
+  /** Whether the draft was published through the drafts of the server. */
+  followed?: boolean
   /** When the service answered. */
   createdAt: string
   /** The commit of the branch that the change ends at. */

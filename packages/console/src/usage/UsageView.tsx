@@ -88,6 +88,18 @@ export function UsageView({ portal }: { portal: PortalSource }) {
   }
   const value = usage.value
 
+  function saveOutcomes(on: boolean) {
+    setBusy(true)
+    setFailure(undefined)
+    portal
+      .setUsageOutcomes(on)
+      .then(
+        updated => setUsage({ state: 'ready', value: updated }),
+        (error: unknown) => setFailure(errorMessage(error))
+      )
+      .finally(() => setBusy(false))
+  }
+
   function save(next: number | null) {
     setBusy(true)
     setFailure(undefined)
@@ -161,6 +173,13 @@ export function UsageView({ portal }: { portal: PortalSource }) {
             ? 'An administrator set this cap. The credits beyond the included volume count as an overage of the month.'
             : 'An administrator set this cap, within the included volume: nothing is billed beyond the license.'}
       </p>
+      {typeof value.outcomes === 'boolean' && (
+        <OutcomeSignal
+          on={value.outcomes}
+          busy={busy}
+          onChange={saveOutcomes}
+        />
+      )}
       {failure && (
         <p className="notice" role="alert">
           {failure}
@@ -179,6 +198,45 @@ export function UsageView({ portal }: { portal: PortalSource }) {
         heading="Repository"
         rows={rows(value.byRepository)}
       />
+    </div>
+  )
+}
+
+/**
+ * The setting of the outcome signal: whether Compadr tells the assist
+ * service what became of each suggestion, without its content.
+ */
+function OutcomeSignal({
+  on,
+  busy,
+  onChange,
+}: {
+  on: boolean
+  busy: boolean
+  onChange: (on: boolean) => void
+}) {
+  const id = useId()
+  return (
+    <div className="usage-outcomes">
+      <label htmlFor={id}>
+        <input
+          id={id}
+          type="checkbox"
+          checked={on}
+          disabled={busy}
+          onChange={event => onChange(event.target.checked)}
+        />{' '}
+        Send the outcome of each suggestion
+      </label>
+      <p className="hint">
+        Compadr tells the assist service whether a person saw a suggestion.
+        Where the server publishes the drafts itself, Compadr also tells whether
+        a person published a drafted record or discarded it. The outcome names
+        the suggestion by the hash of its request, and holds no code and no text
+        of a record. The service uses these outcomes to measure the quality of
+        each version. When an administrator turns the signal off, the service
+        deletes the outcomes that it recorded for this account.
+      </p>
     </div>
   )
 }

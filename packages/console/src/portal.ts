@@ -195,6 +195,11 @@ export interface UsageInfo {
   used: number
   byKind: Record<string, number>
   byRepository: Record<string, number>
+  /**
+   * Whether the assist service records the outcomes of the suggestions of
+   * the customer. Absent when the service records none.
+   */
+  outcomes?: boolean
 }
 
 /** The invitations of a customer of the hosted service, for its administrators. */
@@ -263,6 +268,8 @@ export interface PortalSource {
   usage(): Promise<UsageInfo | null>
   /** Sets the cap of the AI credits; null goes back to the included volume. */
   setUsageCap(cap: number | null): Promise<UsageInfo>
+  /** Turns the outcome signal of the customer on or off. */
+  setUsageOutcomes(on: boolean): Promise<UsageInfo>
   /**
    * The invitations of the customer, or null when no hosted service runs
    * the portal.
@@ -411,6 +418,8 @@ export function httpPortalSource(
     usage: () => getOptional<UsageInfo>(`${PORTAL_API}/usage`),
     setUsageCap: cap =>
       send<UsageInfo>('PUT', `${PORTAL_API}/usage/cap`, { cap }),
+    setUsageOutcomes: on =>
+      send<UsageInfo>('PUT', `${PORTAL_API}/usage/outcomes`, { outcomes: on }),
     invitations: () =>
       getOptional<InvitationsInfo>(`${PORTAL_API}/invitations`),
     invite: (account, email) =>
