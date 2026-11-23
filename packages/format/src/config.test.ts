@@ -58,6 +58,24 @@ describe('parseCompadrConfig', () => {
     expect(excludedFromAssist(config.assist, 'src/keys.test.ts')).toBe(false)
   })
 
+  it('keeps the semantic check off when assist.exclude holds a pattern', () => {
+    for (const pattern of [
+      'src/*.ts',
+      '**/*.key',
+      'src/[ab].ts',
+      'src/?.ts',
+      'src/{a,b}',
+    ]) {
+      const config = parseCompadrConfig(
+        `assist:\n  semantic: true\n  exclude:\n    - private/\n    - "${pattern}"\n`
+      )
+      expect(config.assist).toEqual({ semantic: false, exclude: [] })
+      expect(config.problems).toEqual([
+        `compadr.yml: assist.exclude holds the pattern ${JSON.stringify(pattern)}, but it lists paths and folders, not patterns, so the semantic check stays off`,
+      ])
+    }
+  })
+
   it('keeps the semantic check off when a setting of assist cannot be read', () => {
     for (const text of [
       'assist:\n  semantic: yes please\n',
